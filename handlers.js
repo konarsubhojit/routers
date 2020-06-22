@@ -19,11 +19,8 @@ function newpage(data,res,handle){
     console.log("Handling newpage request");
     if(data.fname == undefined || data.lname == undefined){
         console.log("Requested /newpage without data. Redirecting..");
-        res.writeHead(301,{"Location":"/"});
+        res.writeHead(302,{"Location":"/"});
         res.write("Redirecting to home page...");
-        setTimeout(function () {
-            route(handle,"/",data,res);
-        },2000);
     } else{
         res.writeHead(200,{"Content-Type": "text/html"});
         var name = data.fname + ' ' + data.lname;
@@ -37,10 +34,13 @@ function register(data,res,handle){
     if(data.submit == undefined){
         res.write(form());
     } else{
-        var name = data.name;
-        var email = data.email;
-        var favoriteBook = data.favoriteBook;
-        var password = data.password;
+        var data = JSON.stringify({
+            name : data.name,
+            email : data.email,
+            favoriteBook : data.favoriteBook
+        });
+        console.log(data);
+        res.write(data);
     }
     res.end();
 }
