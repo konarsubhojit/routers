@@ -11,6 +11,12 @@ let counter = 0;
 function startServer(route,handle,port){
   http.createServer(function (req, res) {
     console.log(`${req.method} ${req.url}`);
+    
+    // Add basic security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
     // parse URL
     const parsedUrl = url.parse(req.url);
     // extract URL path
@@ -26,7 +32,14 @@ function startServer(route,handle,port){
     );
     req.addListener('end',
       function listener(){
-        data = qs.parse(data);
+        try {
+          data = qs.parse(data);
+        } catch (err) {
+          console.error('Error parsing request data:', err);
+          res.statusCode = 400;
+          res.end('Bad Request');
+          return;
+        }
         if(pathname.match("^(/includes)")){
           console.log("matched");
           // maps file extention to MIME typere
@@ -47,25 +60,35 @@ function startServer(route,handle,port){
           const regex = /^\/includes\//;
           pathname = pathname.replace(regex,'./');
           
-          fs.exists(pathname, function (exist) {
-            if(!exist) {
+          fs.access(pathname, fs.constants.F_OK, function (err) {
+            if(err) {
               route(handle,pathname,data,res);
               return;
             }
 
-            // if is a directory search for index file matching the extention
-            if (fs.statSync(pathname).isDirectory()) route(handle,pathname,data,res);
-
-            // read file from file system
-            fs.readFile(pathname, function(err, data){
-              if(err){
-                res.statusCode = 500;
-                res.end(`Error getting the file: ${err}.`);
-              } else {
-                // if the file is found, set Content-type and send data
-                res.setHeader('Content-type', map[ext] || 'text/plain' );
-                res.end(data);
+            fs.stat(pathname, function(err, stats) {
+              if(err) {
+                route(handle,pathname,data,res);
+                return;
               }
+
+              // if is a directory search for index file matching the extension
+              if (stats.isDirectory()) {
+                route(handle,pathname,data,res);
+                return;
+              }
+
+              // read file from file system
+              fs.readFile(pathname, function(err, fileData){
+                if(err){
+                  res.statusCode = 500;
+                  res.end(`Error getting the file: ${err}.`);
+                } else {
+                  // if the file is found, set Content-type and send data
+                  res.setHeader('Content-type', map[ext] || 'text/plain' );
+                  res.end(fileData);
+                }
+              });
             });
           });
         }
@@ -74,8 +97,10 @@ function startServer(route,handle,port){
         }
       }
     );
-    console.log("No. of requests recieved: " + ++counter);
-  }).listen(port);
+    console.log("No. of requests received: " + ++counter);
+  }).listen(port, function() {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
 }
 
 exports.startServer = startServer;

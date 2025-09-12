@@ -9,38 +9,49 @@ const form = pug.compileFile('register.pug');
 
 function home(data,res,handle){
     console.log("Handling home request");
-    var htmlFile = fs.readFileSync('index.html','utf8');
-    res.writeHead(200,{"Content-Type": "text/html"});
-    res.write(htmlFile);
-    res.end();
+    fs.readFile('index.html','utf8', function(err, htmlFile) {
+        if(err) {
+            res.writeHead(500,{"Content-Type": "text/plain"});
+            res.end('Internal Server Error');
+            return;
+        }
+        res.writeHead(200,{"Content-Type": "text/html"});
+        res.write(htmlFile);
+        res.end();
+    });
 }
 
 function newpage(data,res,handle){
     console.log("Handling newpage request");
-    if(data.fname == undefined || data.lname == undefined){
-        console.log("Requested /newpage without data. Redirecting..");
+    if(!data.fname || !data.lname || data.fname.trim() === '' || data.lname.trim() === ''){
+        console.log("Requested /newpage without valid data. Redirecting..");
         res.writeHead(302,{"Location":"/"});
         res.write("Redirecting to home page...");
     } else{
         res.writeHead(200,{"Content-Type": "text/html"});
-        var name = data.fname + ' ' + data.lname;
+        // Sanitize input to prevent XSS
+        var fname = data.fname.toString().trim().slice(0, 50);
+        var lname = data.lname.toString().trim().slice(0, 50);
+        var name = fname + ' ' + lname;
         res.write(message({name: name}));
-        res.end();
     }
+    res.end();
 }
 
 function register(data,res,handle){
     console.log("Handling register request");
     if(data.submit == undefined){
+        res.writeHead(200,{"Content-Type": "text/html"});
         res.write(form());
     } else{
-        var data = JSON.stringify({
+        var userData = JSON.stringify({
             name : data.name,
             email : data.email,
             favoriteBook : data.favoriteBook
         });
-        console.log(data);
-        res.write(data);
+        console.log(userData);
+        res.writeHead(200,{"Content-Type": "application/json"});
+        res.write(userData);
     }
     res.end();
 }
