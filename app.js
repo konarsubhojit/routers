@@ -6,7 +6,6 @@ var handle = {};
 handle['/'] = handlers.home;
 handle['/newpage'] = handlers.newpage;
 handle['/register'] = handlers.register;
-handle['/includes'] = handlers.includes;
 
-server.startServer(router.route,handle,80);
+server.startServer(router.route,handle,3000);
                   
