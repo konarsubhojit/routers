@@ -60,21 +60,21 @@ function startServer(route,handle,port){
           const regex = /^\/includes\//;
           pathname = pathname.replace(regex,'./');
           
-          fs.access(pathname, fs.constants.F_OK, function (err) {
+            fs.access(pathname, fs.constants.F_OK, function (err) {
             if(err) {
-              route(handle,pathname,data,res);
+              route(handle,pathname,data,res,req);
               return;
             }
 
             fs.stat(pathname, function(err, stats) {
               if(err) {
-                route(handle,pathname,data,res);
+                route(handle,pathname,data,res,req);
                 return;
               }
 
               // if is a directory search for index file matching the extension
               if (stats.isDirectory()) {
-                route(handle,pathname,data,res);
+                route(handle,pathname,data,res,req);
                 return;
               }
 
@@ -93,7 +93,7 @@ function startServer(route,handle,port){
           });
         }
         else{
-          route(handle,pathname,data,res);
+          route(handle,pathname,data,res,req);
         }
       }
     );
