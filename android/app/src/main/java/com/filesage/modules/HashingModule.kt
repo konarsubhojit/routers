@@ -53,8 +53,7 @@ class HashingModule(private val reactContext: ReactApplicationContext) :
 private fun ByteArray.toHexString(): String {
   val output = StringBuilder(size * 2)
   for (byte in this) {
-    output.append(((byte.toInt() shr 4) and 0x0f).toString(16))
-    output.append((byte.toInt() and 0x0f).toString(16))
+    output.append(String.format("%02x", byte.toInt() and 0xff))
   }
   return output.toString()
 }
