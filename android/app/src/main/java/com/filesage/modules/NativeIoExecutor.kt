@@ -4,6 +4,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 object NativeIoExecutor {
+  // Two threads keep scan and hash I/O work overlapping without over-provisioning.
   private const val NATIVE_IO_THREAD_POOL_SIZE = 2
   private var activeClients = 0
   private var sharedExecutor: ExecutorService? = null
@@ -26,6 +27,7 @@ object NativeIoExecutor {
     }
     activeClients -= 1
     if (activeClients == 0) {
+      // shutdown() lets in-flight work drain while preventing new submissions.
       sharedExecutor?.shutdown()
       sharedExecutor = null
     }
