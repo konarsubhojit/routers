@@ -32,8 +32,8 @@ function mapLabelToClassification(label: string | null): Classification {
     return UNKNOWN;
   }
 
-  const labelTokens = normalizedLabel.replace(/[_-]+/g, ' ');
-  const hasStandaloneId = /\bid\b/.test(labelTokens);
+  const labelWithSpaces = normalizedLabel.replace(/[_-]+/g, ' ');
+  const hasStandaloneId = /\bid\b/.test(labelWithSpaces);
 
   if (
     normalizedLabel.includes('temporary') ||
