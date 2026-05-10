@@ -25,6 +25,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
 
   override fun getName(): String = "FileScannerModule"
 
+  @Deprecated("Use requestTreePermission for generic SAF tree selection.")
   @ReactMethod
   fun requestDownloadsTreePermission(promise: Promise) {
     requestTreePermission(promise)
