@@ -14,6 +14,39 @@ function buildClassifier(
 }
 
 describe('createTieredClassifier', () => {
+  it('isAvailable returns true when any tier is available', async () => {
+    const tiered = createTieredClassifier([
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+      buildClassifier(jest.fn().mockResolvedValue(true), jest.fn().mockResolvedValue('PERMANENT')),
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+    ]);
+
+    await expect(tiered.isAvailable()).resolves.toBe(true);
+  });
+
+  it('isAvailable returns false when all tiers are unavailable', async () => {
+    const tiered = createTieredClassifier([
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+    ]);
+
+    await expect(tiered.isAvailable()).resolves.toBe(false);
+  });
+
+  it('isAvailable falls through errors and checks remaining tiers', async () => {
+    const tiered = createTieredClassifier([
+      buildClassifier(
+        jest.fn().mockRejectedValue(new Error('tier1 unavailable check failed')),
+        jest.fn().mockResolvedValue('UNKNOWN'),
+      ),
+      buildClassifier(jest.fn().mockResolvedValue(true), jest.fn().mockResolvedValue('PERMANENT')),
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+    ]);
+
+    await expect(tiered.isAvailable()).resolves.toBe(true);
+  });
+
   it('uses the highest-priority available tier', async () => {
     const tier1Classify = jest.fn().mockResolvedValue('TEMPORARY');
     const tier2Classify = jest.fn().mockResolvedValue('PERMANENT');
