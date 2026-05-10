@@ -2,6 +2,7 @@ package com.filesage.modules
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -54,9 +55,23 @@ class AICoreClassifierModule(private val reactContext: ReactApplicationContext) 
     }
 
     val serviceIntent = Intent(AICORE_SERVICE_ACTION).setPackage(AICORE_PACKAGE_NAME)
-    val matchingServices = packageManager.queryIntentServices(serviceIntent, PackageManager.MATCH_DEFAULT_ONLY)
+    val matchingServices = queryIntentServices(packageManager, serviceIntent)
     return matchingServices.isNotEmpty()
   }
+
+  @Suppress("DEPRECATION")
+  private fun queryIntentServices(
+    packageManager: PackageManager,
+    serviceIntent: Intent,
+  ) =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.queryIntentServices(
+        serviceIntent,
+        PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+      )
+    } else {
+      packageManager.queryIntentServices(serviceIntent, PackageManager.MATCH_DEFAULT_ONLY)
+    }
 
   private fun isPackageInstalled(packageName: String): Boolean =
     try {

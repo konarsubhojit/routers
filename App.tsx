@@ -136,7 +136,7 @@ function AppContent() {
           paddingBottom: safeAreaInsets.bottom + 24,
         },
       ]}>
-      <Text style={styles.title}>DownloadSorter</Text>
+      <Text style={styles.title}>FileSage DownloadSorter</Text>
       <Text style={styles.subtitle}>Read-only scan for any selected folder</Text>
 
       <View style={styles.settingsCard}>
