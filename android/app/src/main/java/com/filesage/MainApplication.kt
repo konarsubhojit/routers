@@ -1,4 +1,4 @@
-package com.konarsubhojit.downloadsorter
+package com.filesage
 
 import android.app.Application
 import com.facebook.react.PackageList

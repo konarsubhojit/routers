@@ -1,10 +1,10 @@
-# DownloadSorter
+# FileSage
 
-React Native (bare) + TypeScript scaffold for the DownloadSorter rewrite.
+React Native (bare) + TypeScript scaffold for the FileSage app.
 
 ## Android configuration
 
-- **Application ID / package**: `com.konarsubhojit.downloadsorter`
+- **Application ID / package**: `com.filesage`
 - **Minimum SDK**: 26
 - **Target SDK**: 34
 
