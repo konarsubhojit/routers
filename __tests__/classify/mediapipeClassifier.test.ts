@@ -52,4 +52,14 @@ describe('mediapipeClassifier', () => {
       mediapipeClassifier.classify({path: 'some text'}),
     ).resolves.toBe('UNKNOWN');
   });
+
+  it('returns UNKNOWN without invoking native classify for URI-like paths', async () => {
+    await expect(
+      mediapipeClassifier.classify({
+        path: 'content://downloads/public_downloads/42',
+      }),
+    ).resolves.toBe('UNKNOWN');
+
+    expect(classifyTextWithMediaPipeMock).not.toHaveBeenCalled();
+  });
 });

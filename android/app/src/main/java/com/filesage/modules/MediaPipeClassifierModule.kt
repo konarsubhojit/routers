@@ -44,7 +44,12 @@ class MediaPipeClassifierModule(private val reactContext: ReactApplicationContex
         val result = getOrCreateClassifier().classify(trimmedText)
         promise.resolve(extractTopLabel(result))
       } catch (error: Exception) {
-        promise.reject("E_MEDIAPIPE_CLASSIFY_FAILED", "Failed to classify text with MediaPipe.", error)
+        val detail = error.message ?: "unknown error"
+        promise.reject(
+          "E_MEDIAPIPE_CLASSIFY_FAILED",
+          "Failed to classify text with MediaPipe: $detail",
+          error,
+        )
       }
     }
   }

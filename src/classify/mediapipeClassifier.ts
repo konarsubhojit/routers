@@ -4,6 +4,24 @@ import {
 } from '../native/MediaPipeClassifier';
 import {Classification, Classifier, FileMeta, UNKNOWN} from './types';
 
+function extractTextCandidate(file: FileMeta): string | null {
+  const candidate = file.path.trim();
+  if (candidate.length === 0) {
+    return null;
+  }
+
+  if (
+    candidate.startsWith('content://') ||
+    candidate.startsWith('file://') ||
+    candidate.includes('/') ||
+    candidate.includes('\\')
+  ) {
+    return null;
+  }
+
+  return candidate;
+}
+
 function mapLabelToClassification(label: string | null): Classification {
   if (label == null) {
     return UNKNOWN;
@@ -50,7 +68,12 @@ export const mediapipeClassifier: Classifier = {
 
   async classify(file: FileMeta): Promise<Classification> {
     try {
-      const label = await classifyTextWithMediaPipe(file.path);
+      const textCandidate = extractTextCandidate(file);
+      if (textCandidate == null) {
+        return UNKNOWN;
+      }
+
+      const label = await classifyTextWithMediaPipe(textCandidate);
       return mapLabelToClassification(label);
     } catch {
       return UNKNOWN;
