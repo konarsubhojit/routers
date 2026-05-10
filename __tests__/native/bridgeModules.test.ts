@@ -31,9 +31,13 @@ describe('native bridge modules', () => {
     };
 
     await expect(requestTreePermission()).resolves.toBe('content://tree/folder');
+    expect(requestTreePermissionMock).toHaveBeenCalledTimes(1);
+
     await expect(requestDownloadsTreePermission()).resolves.toBe(
       'content://tree/folder',
     );
+    expect(requestTreePermissionMock).toHaveBeenCalledTimes(2);
+
     await expect(scanTree('content://tree/folder')).resolves.toEqual([
       {
         uri: 'content://com.example.documents/tree/1',
@@ -44,7 +48,6 @@ describe('native bridge modules', () => {
       },
     ]);
 
-    expect(requestTreePermissionMock).toHaveBeenCalledTimes(2);
     expect(scanTreeMock).toHaveBeenCalledWith('content://tree/folder');
   });
 

@@ -5,9 +5,28 @@ import java.util.concurrent.Executors
 
 object NativeIoExecutor {
   private const val NATIVE_IO_THREAD_POOL_SIZE = 2
+  private var activeClients = 0
+  private var sharedExecutor: ExecutorService? = null
 
-  // This executor is process-scoped and intentionally lives for the app lifetime.
   // Scanner and hashing are both I/O-bound and short-lived; two workers allow overlap
   // (e.g., one scan + one hash) without creating a thread per module.
-  val executor: ExecutorService = Executors.newFixedThreadPool(NATIVE_IO_THREAD_POOL_SIZE)
+  @Synchronized
+  fun acquire(): ExecutorService {
+    if (sharedExecutor == null || sharedExecutor?.isShutdown == true) {
+      sharedExecutor = Executors.newFixedThreadPool(NATIVE_IO_THREAD_POOL_SIZE)
+    }
+    activeClients += 1
+    return checkNotNull(sharedExecutor)
+  }
+
+  @Synchronized
+  fun release() {
+    if (activeClients > 0) {
+      activeClients -= 1
+    }
+    if (activeClients == 0) {
+      sharedExecutor?.shutdown()
+      sharedExecutor = null
+    }
+  }
 }

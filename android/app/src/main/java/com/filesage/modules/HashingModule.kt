@@ -10,12 +10,13 @@ import java.security.MessageDigest
 
 class HashingModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
+  private val ioExecutor = NativeIoExecutor.acquire()
 
   override fun getName(): String = "HashingModule"
 
   @ReactMethod
   fun sha256(contentUriString: String, promise: Promise) {
-    NativeIoExecutor.executor.execute {
+    ioExecutor.execute {
       try {
         val contentUri = Uri.parse(contentUriString)
         val digest = MessageDigest.getInstance("SHA-256")
@@ -38,6 +39,11 @@ class HashingModule(private val reactContext: ReactApplicationContext) :
         promise.reject("E_HASH_FAILED", "Failed to compute SHA-256 for content URI.", error)
       }
     }
+  }
+
+  override fun invalidate() {
+    super.invalidate()
+    NativeIoExecutor.release()
   }
 }
 

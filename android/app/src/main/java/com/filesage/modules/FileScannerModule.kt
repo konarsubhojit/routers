@@ -18,6 +18,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
   ActivityEventListener {
 
   private var pendingPermissionPromise: Promise? = null
+  private val ioExecutor = NativeIoExecutor.acquire()
 
   init {
     reactContext.addActivityEventListener(this)
@@ -61,7 +62,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun scanTree(treeUriString: String, promise: Promise) {
-    NativeIoExecutor.executor.execute {
+    ioExecutor.execute {
       try {
         val treeUri = Uri.parse(treeUriString)
         if (!DocumentsContract.isTreeUri(treeUri)) {
@@ -113,6 +114,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
   override fun invalidate() {
     super.invalidate()
     reactContext.removeActivityEventListener(this)
+    NativeIoExecutor.release()
   }
 
   private fun collectFilesRecursively(
