@@ -16,6 +16,7 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,9 +41,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
-      - name: Build debug APK and run unit tests
+      - name: Build debug + release APKs and run unit tests
         working-directory: android
-        run: ./gradlew assembleDebug test --build-cache --parallel --stacktrace
+        run: ./gradlew assembleDebug assembleRelease test --build-cache --parallel --stacktrace
 
       - name: Upload debug APK
         if: always() && github.event_name == 'push'
@@ -61,6 +62,15 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 3
+
+      - name: Upload release APK
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload test reports
         if: always()
