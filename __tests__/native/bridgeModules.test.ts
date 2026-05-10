@@ -1,6 +1,7 @@
 import {NativeModules} from 'react-native';
 
 import {
+  requestTreePermission,
   requestDownloadsTreePermission,
   scanTree,
 } from '../../src/native/FileScanner';
@@ -13,12 +14,10 @@ describe('native bridge modules', () => {
   });
 
   it('delegates FileScanner calls to FileScannerModule', async () => {
-    const requestDownloadsTreePermissionMock = jest
-      .fn()
-      .mockResolvedValue('content://tree/downloads');
+    const requestTreePermissionMock = jest.fn().mockResolvedValue('content://tree/folder');
     const scanTreeMock = jest.fn().mockResolvedValue([
       {
-        uri: 'content://downloads/public_downloads/1',
+        uri: 'content://com.example.documents/tree/1',
         name: 'invoice.pdf',
         sizeBytes: 1024,
         mtime: 1715000000000,
@@ -27,16 +26,17 @@ describe('native bridge modules', () => {
     ]);
 
     (NativeModules as Record<string, unknown>).FileScannerModule = {
-      requestDownloadsTreePermission: requestDownloadsTreePermissionMock,
+      requestTreePermission: requestTreePermissionMock,
       scanTree: scanTreeMock,
     };
 
+    await expect(requestTreePermission()).resolves.toBe('content://tree/folder');
     await expect(requestDownloadsTreePermission()).resolves.toBe(
-      'content://tree/downloads',
+      'content://tree/folder',
     );
-    await expect(scanTree('content://tree/downloads')).resolves.toEqual([
+    await expect(scanTree('content://tree/folder')).resolves.toEqual([
       {
-        uri: 'content://downloads/public_downloads/1',
+        uri: 'content://com.example.documents/tree/1',
         name: 'invoice.pdf',
         sizeBytes: 1024,
         mtime: 1715000000000,
@@ -44,8 +44,22 @@ describe('native bridge modules', () => {
       },
     ]);
 
+    expect(requestTreePermissionMock).toHaveBeenCalledTimes(2);
+    expect(scanTreeMock).toHaveBeenCalledWith('content://tree/folder');
+  });
+
+  it('falls back to requestDownloadsTreePermission when requestTreePermission is missing', async () => {
+    const requestDownloadsTreePermissionMock = jest
+      .fn()
+      .mockResolvedValue('content://tree/fallback');
+
+    (NativeModules as Record<string, unknown>).FileScannerModule = {
+      requestDownloadsTreePermission: requestDownloadsTreePermissionMock,
+      scanTree: jest.fn().mockResolvedValue([]),
+    };
+
+    await expect(requestTreePermission()).resolves.toBe('content://tree/fallback');
     expect(requestDownloadsTreePermissionMock).toHaveBeenCalledTimes(1);
-    expect(scanTreeMock).toHaveBeenCalledWith('content://tree/downloads');
   });
 
   it('delegates hashing calls to HashingModule', async () => {

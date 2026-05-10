@@ -3,7 +3,8 @@ import {NativeModules} from 'react-native';
 import {NativeScannedFileMetadata} from './types';
 
 interface FileScannerModuleSpec {
-  requestDownloadsTreePermission(): Promise<string>;
+  requestTreePermission?(): Promise<string>;
+  requestDownloadsTreePermission?(): Promise<string>;
   scanTree(treeUri: string): Promise<NativeScannedFileMetadata[]>;
 }
 
@@ -16,8 +17,22 @@ function getFileScannerModule(): FileScannerModuleSpec {
   return module;
 }
 
+export async function requestTreePermission(): Promise<string> {
+  const fileScanner = getFileScannerModule();
+  if (fileScanner.requestTreePermission != null) {
+    return fileScanner.requestTreePermission();
+  }
+  if (fileScanner.requestDownloadsTreePermission != null) {
+    return fileScanner.requestDownloadsTreePermission();
+  }
+
+  throw new Error(
+    'FileScannerModule does not expose requestTreePermission or requestDownloadsTreePermission.',
+  );
+}
+
 export async function requestDownloadsTreePermission(): Promise<string> {
-  return getFileScannerModule().requestDownloadsTreePermission();
+  return requestTreePermission();
 }
 
 export async function scanTree(

@@ -7,19 +7,15 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import java.io.IOException
 import java.security.MessageDigest
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class HashingModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
-
-  private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
   override fun getName(): String = "HashingModule"
 
   @ReactMethod
   fun sha256(contentUriString: String, promise: Promise) {
-    ioExecutor.execute {
+    NativeIoExecutor.executor.execute {
       try {
         val contentUri = Uri.parse(contentUriString)
         val digest = MessageDigest.getInstance("SHA-256")
@@ -42,11 +38,6 @@ class HashingModule(private val reactContext: ReactApplicationContext) :
         promise.reject("E_HASH_FAILED", "Failed to compute SHA-256 for content URI.", error)
       }
     }
-  }
-
-  override fun invalidate() {
-    super.invalidate()
-    ioExecutor.shutdown()
   }
 }
 

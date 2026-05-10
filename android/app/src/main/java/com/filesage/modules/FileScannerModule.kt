@@ -12,15 +12,12 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class FileScannerModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext),
   ActivityEventListener {
 
   private var pendingPermissionPromise: Promise? = null
-  private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
   init {
     reactContext.addActivityEventListener(this)
@@ -30,6 +27,11 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun requestDownloadsTreePermission(promise: Promise) {
+    requestTreePermission(promise)
+  }
+
+  @ReactMethod
+  fun requestTreePermission(promise: Promise) {
     val activity = currentActivity
     if (activity == null) {
       promise.reject("E_NO_ACTIVITY", "Cannot request SAF permission without an active Activity.")
@@ -58,7 +60,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun scanTree(treeUriString: String, promise: Promise) {
-    ioExecutor.execute {
+    NativeIoExecutor.executor.execute {
       try {
         val treeUri = Uri.parse(treeUriString)
         if (!DocumentsContract.isTreeUri(treeUri)) {
@@ -96,10 +98,9 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
       val intentFlags =
         data.flags and
           (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-      val persistableFlags =
-        if (intentFlags == 0) Intent.FLAG_GRANT_READ_URI_PERMISSION else intentFlags
-
-      reactContext.contentResolver.takePersistableUriPermission(treeUri, persistableFlags)
+      if (intentFlags != 0) {
+        reactContext.contentResolver.takePersistableUriPermission(treeUri, intentFlags)
+      }
       promise.resolve(treeUri.toString())
     } catch (securityException: SecurityException) {
       promise.reject("E_PERSIST_PERMISSION_FAILED", "Failed to persist SAF permission.", securityException)
@@ -111,7 +112,6 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
   override fun invalidate() {
     super.invalidate()
     reactContext.removeActivityEventListener(this)
-    ioExecutor.shutdown()
   }
 
   private fun collectFilesRecursively(

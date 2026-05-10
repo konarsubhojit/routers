@@ -34,8 +34,8 @@ These steps must be run on an Android emulator/device (not in CI):
 
 1. Start the app with `npm run android`.
 2. In a debug JS context (for example Metro console or app dev menu), import:
-   `requestDownloadsTreePermission`, `scanTree`, and `sha256` from `src/native`.
-3. Call `requestDownloadsTreePermission()` and select the **Downloads** folder in the SAF picker.
+   `requestTreePermission`, `scanTree`, and `sha256` from `src/native`.
+3. Call `requestTreePermission()` and select any folder you want to scan in the SAF picker.
 4. Call `scanTree(<returnedTreeUri>)` and verify that it returns entries with
    `{uri, name, sizeBytes, mtime, mimeType}`.
 5. Pick one returned file URI and call `sha256(file.uri)` to verify a lowercase
