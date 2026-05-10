@@ -66,6 +66,9 @@ yarn-error.log
 # testing
 /coverage
 
+# local MediaPipe model asset
+/android/app/src/main/assets/*.tflite
+
 # Yarn
 .yarn/*
 !.yarn/patches

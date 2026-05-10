@@ -6,11 +6,16 @@ import {
   scanTree,
 } from '../../src/native/FileScanner';
 import {sha256} from '../../src/native/Hashing';
+import {
+  classifyTextWithMediaPipe,
+  isMediaPipeModelAvailable,
+} from '../../src/native/MediaPipeClassifier';
 
 describe('native bridge modules', () => {
   afterEach(() => {
     delete (NativeModules as Record<string, unknown>).FileScannerModule;
     delete (NativeModules as Record<string, unknown>).HashingModule;
+    delete (NativeModules as Record<string, unknown>).MediaPipeClassifierModule;
   });
 
   it('delegates FileScanner calls to FileScannerModule', async () => {
@@ -80,12 +85,33 @@ describe('native bridge modules', () => {
     );
   });
 
+  it('delegates MediaPipe calls to MediaPipeClassifierModule', async () => {
+    const isModelAvailableMock = jest.fn().mockResolvedValue(true);
+    const classifyTextMock = jest.fn().mockResolvedValue('boarding_pass');
+
+    (NativeModules as Record<string, unknown>).MediaPipeClassifierModule = {
+      isModelAvailable: isModelAvailableMock,
+      classifyText: classifyTextMock,
+    };
+
+    await expect(isMediaPipeModelAvailable()).resolves.toBe(true);
+    expect(isModelAvailableMock).toHaveBeenCalledTimes(1);
+
+    await expect(classifyTextWithMediaPipe('boarding pass')).resolves.toBe(
+      'boarding_pass',
+    );
+    expect(classifyTextMock).toHaveBeenCalledWith('boarding pass');
+  });
+
   it('throws a clear error when native modules are unavailable', async () => {
     await expect(requestDownloadsTreePermission()).rejects.toThrow(
       'FileScannerModule is not available on this platform.',
     );
     await expect(sha256('content://downloads/public_downloads/1')).rejects.toThrow(
       'HashingModule is not available on this platform.',
+    );
+    await expect(isMediaPipeModelAvailable()).rejects.toThrow(
+      'MediaPipeClassifierModule is not available on this platform.',
     );
   });
 });
