@@ -4,7 +4,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 object NativeIoExecutor {
-  // Two threads keep scan and hash I/O work overlapping without over-provisioning.
+  // Two threads allow one scan task and one hash task to overlap, matching typical usage
+  // while avoiding excessive context switching from larger pools.
   private const val NATIVE_IO_THREAD_POOL_SIZE = 2
   private var activeClients = 0
   private var sharedExecutor: ExecutorService? = null
