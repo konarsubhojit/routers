@@ -1,4 +1,5 @@
-import {requireNativeModule} from './requireNativeModule';
+import {NativeModules} from 'react-native';
+
 import {NativeScannedFileMetadata} from './types';
 
 interface FileScannerModuleSpec {
@@ -8,7 +9,12 @@ interface FileScannerModuleSpec {
 }
 
 function getFileScannerModule(): FileScannerModuleSpec {
-  return requireNativeModule<FileScannerModuleSpec>('FileScannerModule');
+  const module = NativeModules.FileScannerModule as FileScannerModuleSpec | undefined;
+  if (module == null) {
+    throw new Error('FileScannerModule is not available on this platform.');
+  }
+
+  return module;
 }
 
 export async function requestTreePermission(): Promise<string> {

@@ -1,11 +1,16 @@
-import {requireNativeModule} from './requireNativeModule';
+import {NativeModules} from 'react-native';
 
 interface HashingModuleSpec {
   sha256(contentUri: string): Promise<string>;
 }
 
 function getHashingModule(): HashingModuleSpec {
-  return requireNativeModule<HashingModuleSpec>('HashingModule');
+  const module = NativeModules.HashingModule as HashingModuleSpec | undefined;
+  if (module == null) {
+    throw new Error('HashingModule is not available on this platform.');
+  }
+
+  return module;
 }
 
 export async function sha256(contentUri: string): Promise<string> {
