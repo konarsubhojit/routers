@@ -34,7 +34,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun requestTreePermission(promise: Promise) {
-    val activity = currentActivity
+    val activity = reactApplicationContext.currentActivity
     if (activity == null) {
       promise.reject("E_NO_ACTIVITY", "Cannot request SAF permission without an active Activity.")
       return
@@ -82,7 +82,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
-  override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+  override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
     if (requestCode != REQUEST_CODE_OPEN_TREE) {
       return
     }
@@ -109,7 +109,7 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
-  override fun onNewIntent(intent: Intent?) = Unit
+  override fun onNewIntent(intent: Intent) = Unit
 
   override fun invalidate() {
     super.invalidate()
