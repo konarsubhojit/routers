@@ -46,7 +46,7 @@ function mapLabelToClassification(label: string | null): Classification {
   if (
     normalizedLabel.includes('permanent') ||
     normalizedLabel.includes('identity') ||
-    normalizedLabel.includes('id') ||
+    /\bid\b/.test(normalizedLabel.replace(/[_-]+/g, ' ')) ||
     normalizedLabel.includes('certificate') ||
     normalizedLabel.includes('statement') ||
     normalizedLabel.includes('contract')

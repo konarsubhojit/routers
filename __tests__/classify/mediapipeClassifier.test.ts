@@ -53,6 +53,14 @@ describe('mediapipeClassifier', () => {
     ).resolves.toBe('UNKNOWN');
   });
 
+  it('does not classify labels containing incidental "id" substrings as PERMANENT', async () => {
+    classifyTextWithMediaPipeMock.mockResolvedValue('video_clip');
+
+    await expect(
+      mediapipeClassifier.classify({path: 'some text'}),
+    ).resolves.toBe('UNKNOWN');
+  });
+
   it('returns UNKNOWN without invoking native classify for URI-like paths', async () => {
     await expect(
       mediapipeClassifier.classify({
