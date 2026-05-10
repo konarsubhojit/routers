@@ -32,6 +32,9 @@ function mapLabelToClassification(label: string | null): Classification {
     return UNKNOWN;
   }
 
+  const labelTokens = normalizedLabel.replace(/[_-]+/g, ' ');
+  const hasStandaloneId = /\bid\b/.test(labelTokens);
+
   if (
     normalizedLabel.includes('temporary') ||
     normalizedLabel.includes('boarding') ||
@@ -46,7 +49,7 @@ function mapLabelToClassification(label: string | null): Classification {
   if (
     normalizedLabel.includes('permanent') ||
     normalizedLabel.includes('identity') ||
-    /\bid\b/.test(normalizedLabel.replace(/[_-]+/g, ' ')) ||
+    hasStandaloneId ||
     normalizedLabel.includes('certificate') ||
     normalizedLabel.includes('statement') ||
     normalizedLabel.includes('contract')
