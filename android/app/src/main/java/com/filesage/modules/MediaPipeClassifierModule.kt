@@ -95,7 +95,7 @@ class MediaPipeClassifierModule(private val reactContext: ReactApplicationContex
     }
 
     var topCategory: Category? = null
-    for (classification in result.classifications()) {
+    for (classification in result.classificationResult().classifications()) {
       for (category in classification.categories()) {
         if (topCategory == null || category.score() > topCategory.score()) {
           topCategory = category
