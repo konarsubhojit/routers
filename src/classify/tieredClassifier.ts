@@ -1,18 +1,36 @@
-import {Classification, Classifier, FileMeta} from './types';
+import {Classification, Classifier, FileMeta, UNKNOWN} from './types';
+
+type TierOperation = 'isAvailable' | 'classify';
+
+export interface TieredClassifierError {
+  tierIndex: number;
+  operation: TierOperation;
+  error: unknown;
+}
+
+export interface TieredClassifierOptions {
+  onError?: (tierError: TieredClassifierError) => void;
+}
 
 export function createTieredClassifier(
-  [tier1, tier2, tier3]: [Classifier, Classifier, Classifier],
+  tiers: Classifier[],
+  options: TieredClassifierOptions = {},
 ): Classifier {
-  const tiers = [tier1, tier2, tier3];
+  const {onError} = options;
+
+  function reportError(tierIndex: number, operation: TierOperation, error: unknown): void {
+    onError?.({tierIndex, operation, error});
+  }
 
   return {
     async isAvailable(): Promise<boolean> {
-      for (const tier of tiers) {
+      for (const [index, tier] of tiers.entries()) {
         try {
           if (await tier.isAvailable()) {
             return true;
           }
-        } catch {
+        } catch (error: unknown) {
+          reportError(index, 'isAvailable', error);
           continue;
         }
       }
@@ -21,19 +39,20 @@ export function createTieredClassifier(
     },
 
     async classify(file: FileMeta): Promise<Classification> {
-      for (const tier of tiers) {
+      for (const [index, tier] of tiers.entries()) {
         try {
           if (!(await tier.isAvailable())) {
             continue;
           }
 
           return await tier.classify(file);
-        } catch {
+        } catch (error: unknown) {
+          reportError(index, 'classify', error);
           continue;
         }
       }
 
-      return 'UNKNOWN';
+      return UNKNOWN;
     },
   };
 }

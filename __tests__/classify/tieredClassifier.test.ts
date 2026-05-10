@@ -87,4 +87,53 @@ describe('createTieredClassifier', () => {
     await expect(tiered.classify(file)).resolves.toBe('TEMPORARY');
     expect(tier2Classify).toHaveBeenCalledTimes(1);
   });
+
+  it('falls back when isAvailable throws during classify', async () => {
+    const tier2Classify = jest.fn().mockResolvedValue('PERMANENT');
+
+    const tiered = createTieredClassifier([
+      buildClassifier(
+        jest.fn().mockRejectedValue(new Error('tier1 unavailable check failed')),
+        jest.fn().mockResolvedValue('TEMPORARY'),
+      ),
+      buildClassifier(jest.fn().mockResolvedValue(true), tier2Classify),
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('UNKNOWN')),
+    ]);
+
+    await expect(tiered.classify(file)).resolves.toBe('PERMANENT');
+    expect(tier2Classify).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns UNKNOWN when all tiers are unavailable or error out', async () => {
+    const tiered = createTieredClassifier([
+      buildClassifier(jest.fn().mockResolvedValue(false), jest.fn().mockResolvedValue('TEMPORARY')),
+      buildClassifier(jest.fn().mockResolvedValue(true), jest.fn().mockRejectedValue(new Error('tier2 failed'))),
+      buildClassifier(
+        jest.fn().mockRejectedValue(new Error('tier3 unavailable check failed')),
+        jest.fn().mockResolvedValue('PERMANENT'),
+      ),
+    ]);
+
+    await expect(tiered.classify(file)).resolves.toBe('UNKNOWN');
+  });
+
+  it('reports tier errors through onError callback', async () => {
+    const onError = jest.fn();
+
+    const tiered = createTieredClassifier(
+      [
+        buildClassifier(jest.fn().mockRejectedValue(new Error('tier1 check failed')), jest.fn().mockResolvedValue('UNKNOWN')),
+        buildClassifier(jest.fn().mockResolvedValue(true), jest.fn().mockResolvedValue('TEMPORARY')),
+      ],
+      {onError},
+    );
+
+    await expect(tiered.classify(file)).resolves.toBe('TEMPORARY');
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tierIndex: 0,
+        operation: 'classify',
+      }),
+    );
+  });
 });

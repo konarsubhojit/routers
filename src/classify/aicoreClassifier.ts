@@ -1,12 +1,3 @@
-import {Classification, Classifier, FileMeta} from './types';
+import {Classifier, createUnavailableClassifier} from './types';
 
-const UNKNOWN: Classification = 'UNKNOWN';
-
-export const aicoreClassifier: Classifier = {
-  async isAvailable(): Promise<boolean> {
-    return false;
-  },
-  async classify(_file: FileMeta): Promise<Classification> {
-    return UNKNOWN;
-  },
-};
+export const aicoreClassifier: Classifier = createUnavailableClassifier();
