@@ -27,3 +27,16 @@ To run on Android (with emulator/device configured):
 ```sh
 npm run android
 ```
+
+## Manual Android test (Phase 5 native SAF + hashing)
+
+These steps must be run on an Android emulator/device (not in CI):
+
+1. Start the app with `npm run android`.
+2. In a debug JS context (for example Metro console or app dev menu), import:
+   `requestDownloadsTreePermission`, `scanTree`, and `sha256` from `src/native`.
+3. Call `requestDownloadsTreePermission()` and select the **Downloads** folder in the SAF picker.
+4. Call `scanTree(<returnedTreeUri>)` and verify that it returns entries with
+   `{uri, name, sizeBytes, mtime, mimeType}`.
+5. Pick one returned file URI and call `sha256(file.uri)` to verify a lowercase
+   SHA-256 hex string is returned.
