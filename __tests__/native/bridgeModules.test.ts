@@ -7,6 +7,10 @@ import {
 } from '../../src/native/FileScanner';
 import {sha256} from '../../src/native/Hashing';
 import {
+  classifyPathWithAICore,
+  isAICoreAvailable,
+} from '../../src/native/AICoreClassifier';
+import {
   classifyTextWithMediaPipe,
   isMediaPipeModelAvailable,
 } from '../../src/native/MediaPipeClassifier';
@@ -15,6 +19,7 @@ describe('native bridge modules', () => {
   afterEach(() => {
     delete (NativeModules as Record<string, unknown>).FileScannerModule;
     delete (NativeModules as Record<string, unknown>).HashingModule;
+    delete (NativeModules as Record<string, unknown>).AICoreClassifierModule;
     delete (NativeModules as Record<string, unknown>).MediaPipeClassifierModule;
   });
 
@@ -103,6 +108,26 @@ describe('native bridge modules', () => {
     expect(classifyTextMock).toHaveBeenCalledWith('boarding pass');
   });
 
+  it('delegates AICore calls to AICoreClassifierModule', async () => {
+    const isAvailableMock = jest.fn().mockResolvedValue(true);
+    const classifyPathMock = jest.fn().mockResolvedValue('temporary');
+
+    (NativeModules as Record<string, unknown>).AICoreClassifierModule = {
+      isAvailable: isAvailableMock,
+      classifyPath: classifyPathMock,
+    };
+
+    await expect(isAICoreAvailable()).resolves.toBe(true);
+    expect(isAvailableMock).toHaveBeenCalledTimes(1);
+
+    await expect(classifyPathWithAICore('/storage/emulated/0/Download/ticket.pdf')).resolves.toBe(
+      'temporary',
+    );
+    expect(classifyPathMock).toHaveBeenCalledWith(
+      '/storage/emulated/0/Download/ticket.pdf',
+    );
+  });
+
   it('throws a clear error when native modules are unavailable', async () => {
     await expect(requestDownloadsTreePermission()).rejects.toThrow(
       'FileScannerModule is not available on this platform.',
@@ -112,6 +137,9 @@ describe('native bridge modules', () => {
     );
     await expect(isMediaPipeModelAvailable()).rejects.toThrow(
       'MediaPipeClassifierModule is not available on this platform.',
+    );
+    await expect(isAICoreAvailable()).rejects.toThrow(
+      'AICoreClassifierModule is not available on this platform.',
     );
   });
 });

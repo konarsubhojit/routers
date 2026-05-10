@@ -2,6 +2,8 @@
 
 React Native (bare) + TypeScript scaffold for the FileSage app.
 
+See `ARCHITECTURE.md` for the tiered classifier and pre-processing pipeline design.
+
 ## Android configuration
 
 - **Application ID / package**: `com.filesage`
@@ -28,7 +30,7 @@ To run on Android (with emulator/device configured):
 npm run android
 ```
 
-## Manual Android test (Phase 5 native SAF + hashing)
+## Manual Android test (folder scan + hashing)
 
 These steps must be run on an Android emulator/device (not in CI):
 
