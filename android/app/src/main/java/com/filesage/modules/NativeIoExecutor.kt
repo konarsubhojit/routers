@@ -13,7 +13,7 @@ object NativeIoExecutor {
   @Synchronized
   fun acquire(): ExecutorService {
     activeClients += 1
-    if (sharedExecutor == null || sharedExecutor?.isShutdown == true) {
+    if (sharedExecutor == null) {
       sharedExecutor = Executors.newFixedThreadPool(NATIVE_IO_THREAD_POOL_SIZE)
     }
     return checkNotNull(sharedExecutor)
@@ -21,7 +21,9 @@ object NativeIoExecutor {
 
   @Synchronized
   fun release() {
-    check(activeClients > 0) { "NativeIoExecutor.release() called without a matching acquire()." }
+    check(activeClients > 0) {
+      "NativeIoExecutor.release() called without a matching acquire(). Active clients: $activeClients"
+    }
     activeClients -= 1
     if (activeClients == 0) {
       sharedExecutor?.shutdown()
