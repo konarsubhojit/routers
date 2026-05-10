@@ -40,3 +40,9 @@ These steps must be run on an Android emulator/device (not in CI):
    `{uri, name, sizeBytes, mtime, mimeType}`.
 5. Pick one returned file URI and call `sha256(file.uri)` to verify a lowercase
    SHA-256 hex string is returned.
+
+## MediaPipe text classifier model asset (Phase 6)
+
+- Place the MediaPipe `.tflite` model at:
+  `android/app/src/main/assets/mediapipe_text_classifier.tflite`.
+- Do **not** commit the model file to git.
