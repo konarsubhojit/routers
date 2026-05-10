@@ -4,5 +4,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 object NativeIoExecutor {
-  val executor: ExecutorService = Executors.newFixedThreadPool(2)
+  private const val NATIVE_IO_THREAD_POOL_SIZE = 2
+
+  // Scanner and hashing are both I/O-bound and short-lived; two workers allow overlap
+  // (e.g., one scan + one hash) without creating a thread per module.
+  val executor: ExecutorService = Executors.newFixedThreadPool(NATIVE_IO_THREAD_POOL_SIZE)
 }
