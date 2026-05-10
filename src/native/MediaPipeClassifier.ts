@@ -1,4 +1,4 @@
-import {NativeModules} from 'react-native';
+import {requireNativeModule} from './requireNativeModule';
 
 interface MediaPipeClassifierModuleSpec {
   isModelAvailable(): Promise<boolean>;
@@ -6,13 +6,9 @@ interface MediaPipeClassifierModuleSpec {
 }
 
 function getMediaPipeClassifierModule(): MediaPipeClassifierModuleSpec {
-  const module = NativeModules
-    .MediaPipeClassifierModule as MediaPipeClassifierModuleSpec | undefined;
-  if (module == null) {
-    throw new Error('MediaPipeClassifierModule is not available on this platform.');
-  }
-
-  return module;
+  return requireNativeModule<MediaPipeClassifierModuleSpec>(
+    'MediaPipeClassifierModule',
+  );
 }
 
 export async function isMediaPipeModelAvailable(): Promise<boolean> {

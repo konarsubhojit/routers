@@ -22,6 +22,27 @@ function extractTextCandidate(file: FileMeta): string | null {
   return candidate;
 }
 
+const TEMPORARY_KEYWORDS = [
+  'temporary',
+  'boarding',
+  'ticket',
+  'itinerary',
+  'travel',
+  'reservation',
+];
+
+const PERMANENT_KEYWORDS = [
+  'permanent',
+  'identity',
+  'certificate',
+  'statement',
+  'contract',
+];
+
+function containsAny(haystack: string, needles: readonly string[]): boolean {
+  return needles.some(needle => haystack.includes(needle));
+}
+
 function mapLabelToClassification(label: string | null): Classification {
   if (label == null) {
     return UNKNOWN;
@@ -32,28 +53,13 @@ function mapLabelToClassification(label: string | null): Classification {
     return UNKNOWN;
   }
 
-  const labelWithSpaces = normalizedLabel.replace(/[_-]+/g, ' ');
-  const hasStandaloneId = /\bid\b/.test(labelWithSpaces);
-
-  if (
-    normalizedLabel.includes('temporary') ||
-    normalizedLabel.includes('boarding') ||
-    normalizedLabel.includes('ticket') ||
-    normalizedLabel.includes('itinerary') ||
-    normalizedLabel.includes('travel') ||
-    normalizedLabel.includes('reservation')
-  ) {
+  if (containsAny(normalizedLabel, TEMPORARY_KEYWORDS)) {
     return 'TEMPORARY';
   }
 
-  if (
-    normalizedLabel.includes('permanent') ||
-    normalizedLabel.includes('identity') ||
-    hasStandaloneId ||
-    normalizedLabel.includes('certificate') ||
-    normalizedLabel.includes('statement') ||
-    normalizedLabel.includes('contract')
-  ) {
+  const labelWithSpaces = normalizedLabel.replace(/[_-]+/g, ' ');
+  const hasStandaloneId = /\bid\b/.test(labelWithSpaces);
+  if (hasStandaloneId || containsAny(normalizedLabel, PERMANENT_KEYWORDS)) {
     return 'PERMANENT';
   }
 

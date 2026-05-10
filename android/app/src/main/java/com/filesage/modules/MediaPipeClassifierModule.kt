@@ -103,16 +103,16 @@ class MediaPipeClassifierModule(private val reactContext: ReactApplicationContex
       }
     }
 
-    val categoryName = topCategory?.categoryName()?.trim().orEmpty()
-    if (categoryName.isNotEmpty()) {
-      return categoryName
-    }
+    return firstNonBlank(topCategory?.categoryName(), topCategory?.displayName())
+  }
 
-    val displayName = topCategory?.displayName()?.trim().orEmpty()
-    if (displayName.isNotEmpty()) {
-      return displayName
+  private fun firstNonBlank(vararg values: String?): String? {
+    for (value in values) {
+      val trimmed = value?.trim().orEmpty()
+      if (trimmed.isNotEmpty()) {
+        return trimmed
+      }
     }
-
     return null
   }
 
