@@ -12,18 +12,17 @@ object NativeIoExecutor {
   // (e.g., one scan + one hash) without creating a thread per module.
   @Synchronized
   fun acquire(): ExecutorService {
+    activeClients += 1
     if (sharedExecutor == null || sharedExecutor?.isShutdown == true) {
       sharedExecutor = Executors.newFixedThreadPool(NATIVE_IO_THREAD_POOL_SIZE)
     }
-    activeClients += 1
     return checkNotNull(sharedExecutor)
   }
 
   @Synchronized
   fun release() {
-    if (activeClients > 0) {
-      activeClients -= 1
-    }
+    check(activeClients > 0) { "NativeIoExecutor.release() called without a matching acquire()." }
+    activeClients -= 1
     if (activeClients == 0) {
       sharedExecutor?.shutdown()
       sharedExecutor = null
