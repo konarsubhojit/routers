@@ -49,6 +49,7 @@ jobs:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload debug APK (PR, short retention)
         if: always() && github.event_name == 'pull_request'
