@@ -1,27 +1,29 @@
 # DownloadSorter
 
-DownloadSorter is a new Android-focused app that replaces the legacy Node/Pug demo.
+React Native (bare) + TypeScript scaffold for the DownloadSorter rewrite.
 
-## Architecture (tiered)
+## Android configuration
 
-The planned architecture is split into clear tiers:
+- **Application ID / package**: `com.konarsubhojit.downloadsorter`
+- **Minimum SDK**: 26
+- **Target SDK**: 34
 
-1. **App Layer (React Native + TypeScript)**
-   - UI, orchestration, and preprocessing logic.
-2. **Android Native Layer (Kotlin)**
-   - Platform capabilities such as file access and hashing.
-3. **Tiered Classification Layer**
-   - Tier 1: Gemini Nano via AICore (when available)
-   - Tier 2: On-device MediaPipe/TFLite classifier fallback
-   - Tier 3: Optional cloud classification (opt-in)
+## Tooling
+
+- ESLint + Prettier using React Native defaults (`@react-native/eslint-config`, `.prettierrc.js`)
+- Jest configured with React Native preset (`@react-native/jest-preset`)
+- TypeScript typecheck script: `npm run typecheck`
 
 ## Quickstart
 
-Phase 1 is a repository cleanup and baseline documentation step.
+```sh
+npm ci
+npm run lint
+npm test
+```
 
-Current status:
-- Legacy Node/Pug application files removed.
-- Repository prepared for React Native + Kotlin scaffolding in Phase 2.
+To run on Android (with emulator/device configured):
 
-Next step:
-- Implement the new application skeleton and tooling in Phase 2.
+```sh
+npm run android
+```
