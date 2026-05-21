@@ -3,6 +3,7 @@ package com.filesage.modules
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.util.Log
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -156,7 +157,11 @@ class FileMoverModule(private val reactContext: ReactApplicationContext) :
         sourceParentDocumentUri,
         destinationParentDocumentUri,
       )
-    } catch (_: Exception) {
+    } catch (_: IllegalArgumentException) {
+      null
+    } catch (_: IllegalStateException) {
+      null
+    } catch (_: UnsupportedOperationException) {
       null
     }
 
@@ -184,13 +189,15 @@ class FileMoverModule(private val reactContext: ReactApplicationContext) :
     } catch (securityException: SecurityException) {
       try {
         DocumentsContract.deleteDocument(reactContext.contentResolver, destinationDocumentUri)
-      } catch (_: Exception) {
+      } catch (cleanupError: Exception) {
+        Log.w(TAG, "Failed to clean up destination after copy permission failure.", cleanupError)
       }
       throw securityException
     } catch (error: Exception) {
       try {
         DocumentsContract.deleteDocument(reactContext.contentResolver, destinationDocumentUri)
-      } catch (_: Exception) {
+      } catch (cleanupError: Exception) {
+        Log.w(TAG, "Failed to clean up partially copied destination document.", cleanupError)
       }
       throw CopyFailedException("Failed to copy document to destination.", error)
     }
@@ -198,7 +205,8 @@ class FileMoverModule(private val reactContext: ReactApplicationContext) :
     if (!DocumentsContract.deleteDocument(reactContext.contentResolver, sourceUri)) {
       try {
         DocumentsContract.deleteDocument(reactContext.contentResolver, destinationDocumentUri)
-      } catch (_: Exception) {
+      } catch (cleanupError: Exception) {
+        Log.w(TAG, "Failed to clean up copied destination after delete failure.", cleanupError)
       }
       throw DeleteFailedException("Moved copy created, but failed to delete the source document.")
     }
@@ -250,4 +258,8 @@ class FileMoverModule(private val reactContext: ReactApplicationContext) :
 
   private class DeleteFailedException(message: String, cause: Throwable? = null) :
     IllegalStateException(message, cause)
+
+  companion object {
+    private const val TAG = "FileMoverModule"
+  }
 }
