@@ -22,9 +22,12 @@ test('renders correctly', async () => {
 
   expect(root!).toBeDefined();
   const content = JSON.stringify(root!.toJSON());
-  expect(content).toContain('Scan Folder');
+  expect(content).toContain('Choose Folder');
+  expect(content).toContain('Scan');
   expect(content).toContain('Grouped by bucket');
   expect(content).toContain('Selected for review');
   expect(content).toContain('Tier 3: cloud classification');
   expect(content).toContain('Privacy warning');
+  expect(content).toContain('Full storage access');
+  expect(content).toContain('MANAGE_EXTERNAL_STORAGE');
 });
