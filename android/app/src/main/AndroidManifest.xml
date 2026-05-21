@@ -1,6 +1,18 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+        MANAGE_EXTERNAL_STORAGE (Android 11+ / API 30+) is an opt-in power-user
+        feature that lets the app traverse SAF-restricted directories such as
+        Android/data and Android/obb.  It is gated behind a settings toggle in
+        the app and shown with a Play-Store-policy disclaimer before the user is
+        directed to the system settings screen to grant it.  This permission has
+        no effect on Android < 11.
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <application
       android:name=".MainApplication"

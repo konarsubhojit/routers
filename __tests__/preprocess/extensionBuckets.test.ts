@@ -1,7 +1,22 @@
 import {
+  EXTENSION_BUCKETS,
   extensionToBucket,
   normalizeExtension,
 } from '../../src/preprocess/extensionBuckets';
+
+describe('EXTENSION_BUCKETS', () => {
+  it('exposes deterministic bucket names for destination folders', () => {
+    expect(EXTENSION_BUCKETS).toEqual([
+      'Installers',
+      'Archives',
+      'Images',
+      'Docs',
+      'Audio',
+      'Video',
+      'Other',
+    ]);
+  });
+});
 
 describe('normalizeExtension', () => {
   it('returns empty string for empty input', () => {
