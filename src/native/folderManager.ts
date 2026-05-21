@@ -114,8 +114,7 @@ export function resolveDestinationTreeUri(
     throw new Error('Cannot resolve alongside destination from an invalid SAF tree URI.');
   }
 
-  const [, treePrefix, _encodedTreeId, documentPrefix, encodedDocumentId, suffix] =
-    match;
+  const [, treePrefix, , documentPrefix, encodedDocumentId, suffix] = match;
   const parentDocumentId = getParentDocumentId(decodeURIComponent(encodedDocumentId));
   if (parentDocumentId == null) {
     throw new Error(
@@ -123,8 +122,9 @@ export function resolveDestinationTreeUri(
     );
   }
 
-  const encodedParentDocumentId = encodeURIComponent(parentDocumentId);
-  return `${treePrefix}${encodedParentDocumentId}${documentPrefix}${encodedParentDocumentId}${suffix}`;
+  const encodedParentTreeId = encodeURIComponent(parentDocumentId);
+  const encodedParentDocumentId = encodedParentTreeId;
+  return `${treePrefix}${encodedParentTreeId}${documentPrefix}${encodedParentDocumentId}${suffix}`;
 }
 
 export async function ensureBucketDirectory(
