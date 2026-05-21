@@ -1,11 +1,14 @@
-export type ExtensionBucket =
-  | 'Installers'
-  | 'Archives'
-  | 'Images'
-  | 'Docs'
-  | 'Audio'
-  | 'Video'
-  | 'Other';
+export const EXTENSION_BUCKETS = [
+  'Installers',
+  'Archives',
+  'Images',
+  'Docs',
+  'Audio',
+  'Video',
+  'Other',
+] as const;
+
+export type ExtensionBucket = (typeof EXTENSION_BUCKETS)[number];
 
 const BUCKET_BY_EXTENSION = new Map<string, ExtensionBucket>([
   ['apk', 'Installers'],

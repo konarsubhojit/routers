@@ -9,6 +9,7 @@ class FileSageNativePackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
     listOf(
       FileScannerModule(reactContext),
+      FolderManagerModule(reactContext),
       HashingModule(reactContext),
       AICoreClassifierModule(reactContext),
       MediaPipeClassifierModule(reactContext),

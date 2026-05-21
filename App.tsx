@@ -20,19 +20,15 @@ import {cloudClassifier} from './src/classify/cloudClassifier';
 import {mediapipeClassifier} from './src/classify/mediapipeClassifier';
 import {createTieredClassifier} from './src/classify/tieredClassifier';
 import {isOlderThanThreshold} from './src/preprocess/ageFilter';
-import {ExtensionBucket, extensionToBucket} from './src/preprocess/extensionBuckets';
+import {
+  EXTENSION_BUCKETS,
+  ExtensionBucket,
+  extensionToBucket,
+} from './src/preprocess/extensionBuckets';
 import {requestTreePermission, scanTree, sha256} from './src/native';
 import {NativeScannedFileMetadata} from './src/native/types';
 
-const BUCKET_ORDER: ExtensionBucket[] = [
-  'Installers',
-  'Archives',
-  'Images',
-  'Docs',
-  'Audio',
-  'Video',
-  'Other',
-];
+const BUCKET_ORDER: ExtensionBucket[] = [...EXTENSION_BUCKETS];
 
 type ReviewBadge = 'DUPLICATE' | 'OLD' | 'TEMPORARY';
 
