@@ -2,11 +2,13 @@ import {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Button,
+  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
   Text,
+  TouchableOpacity,
   useColorScheme,
   View,
 } from 'react-native';
@@ -21,7 +23,14 @@ import {mediapipeClassifier} from './src/classify/mediapipeClassifier';
 import {createTieredClassifier} from './src/classify/tieredClassifier';
 import {isOlderThanThreshold} from './src/preprocess/ageFilter';
 import {ExtensionBucket, extensionToBucket} from './src/preprocess/extensionBuckets';
-import {requestTreePermission, scanTree, sha256} from './src/native';
+import {
+  checkManageExternalStorageGranted,
+  isFileScannerError,
+  requestManageExternalStorage,
+  requestTreePermission,
+  scanTree,
+  sha256,
+} from './src/native';
 import {NativeScannedFileMetadata} from './src/native/types';
 
 const BUCKET_ORDER: ExtensionBucket[] = [
@@ -35,6 +44,9 @@ const BUCKET_ORDER: ExtensionBucket[] = [
 ];
 
 type ReviewBadge = 'DUPLICATE' | 'OLD' | 'TEMPORARY';
+
+/** Drives the "Permission needed" screen. */
+type PermissionStatus = 'none' | 'saf_denied' | 'manage_storage_needed';
 
 interface ScannedFileViewModel {
   uri: string;
@@ -59,6 +71,9 @@ function AppContent() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [cloudTierEnabled, setCloudTierEnabled] = useState(false);
+  const [manageStorageEnabled, setManageStorageEnabled] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('none');
+  const [lastTreeUri, setLastTreeUri] = useState<string | null>(null);
   const [classifierDiagnostic, setClassifierDiagnostic] = useState(
     'Classifier diagnostics unavailable until first scan.',
   );
@@ -77,9 +92,81 @@ function AppContent() {
     [cloudTierEnabled],
   );
 
+  const handleManageStorageToggle = useCallback(
+    async (value: boolean) => {
+      setManageStorageEnabled(value);
+      if (value) {
+        const granted = await checkManageExternalStorageGranted().catch(() => false);
+        if (!granted) {
+          setPermissionStatus('manage_storage_needed');
+        }
+      }
+    },
+    [],
+  );
+
+  const handleOpenSettings = useCallback(async () => {
+    if (permissionStatus === 'manage_storage_needed') {
+      await requestManageExternalStorage().catch(() => {});
+    } else {
+      await Linking.openSettings();
+    }
+    setPermissionStatus('none');
+  }, [permissionStatus]);
+
+  const runScan = useCallback(
+    async (treeUri: string) => {
+      setIsScanning(true);
+      setScanError(null);
+      setPermissionStatus('none');
+
+      try {
+        const scannedFiles = await scanTree(treeUri);
+        const fileHashes = await hashFiles(scannedFiles);
+        const duplicateUris = findDuplicateUris(fileHashes);
+
+        const fileModels = await Promise.all(
+          scannedFiles.map(async file => {
+            const name = getDisplayName(file);
+            const classification = await tieredClassifier.classify({path: name});
+            const badges = buildBadges(file, duplicateUris, classification === 'TEMPORARY');
+
+            return {
+              uri: file.uri,
+              name,
+              bucket: extensionToBucket(name),
+              badges,
+            } satisfies ScannedFileViewModel;
+          }),
+        );
+
+        setGroupedFiles(groupFilesByBucket(fileModels));
+        setSelectedForReview(fileModels.filter(file => file.badges.length > 0));
+      } catch (error: unknown) {
+        if (
+          isFileScannerError(error, 'E_PERMISSION_DENIED') ||
+          isFileScannerError(error, 'E_PERMISSION_CANCELLED')
+        ) {
+          setPermissionStatus('saf_denied');
+          setGroupedFiles([]);
+          setSelectedForReview([]);
+        } else {
+          const message = error instanceof Error ? error.message : 'Scan failed.';
+          setScanError(message);
+          setGroupedFiles([]);
+          setSelectedForReview([]);
+        }
+      } finally {
+        setIsScanning(false);
+      }
+    },
+    [tieredClassifier],
+  );
+
   const handleScan = useCallback(async () => {
     setIsScanning(true);
     setScanError(null);
+    setPermissionStatus('none');
 
     try {
       const [aicoreAvailable, mediaPipeAvailable] = await Promise.all([
@@ -95,37 +182,52 @@ function AppContent() {
             : 'No on-device classifier available',
       );
 
+      if (manageStorageEnabled) {
+        const granted = await checkManageExternalStorageGranted().catch(() => false);
+        if (!granted) {
+          setPermissionStatus('manage_storage_needed');
+          setIsScanning(false);
+          return;
+        }
+      }
+
       const treeUri = await requestTreePermission();
-      const scannedFiles = await scanTree(treeUri);
-      const fileHashes = await hashFiles(scannedFiles);
-      const duplicateUris = findDuplicateUris(fileHashes);
-
-      const fileModels = await Promise.all(
-        scannedFiles.map(async file => {
-          const name = getDisplayName(file);
-          const classification = await tieredClassifier.classify({path: name});
-          const badges = buildBadges(file, duplicateUris, classification === 'TEMPORARY');
-
-          return {
-            uri: file.uri,
-            name,
-            bucket: extensionToBucket(name),
-            badges,
-          } satisfies ScannedFileViewModel;
-        }),
-      );
-
-      setGroupedFiles(groupFilesByBucket(fileModels));
-      setSelectedForReview(fileModels.filter(file => file.badges.length > 0));
+      setLastTreeUri(treeUri);
+      await runScan(treeUri);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Scan failed.';
-      setScanError(message);
-      setGroupedFiles([]);
-      setSelectedForReview([]);
-    } finally {
+      if (
+        isFileScannerError(error, 'E_PERMISSION_DENIED') ||
+        isFileScannerError(error, 'E_PERMISSION_CANCELLED')
+      ) {
+        setPermissionStatus('saf_denied');
+        setGroupedFiles([]);
+        setSelectedForReview([]);
+      } else {
+        const message = error instanceof Error ? error.message : 'Scan failed.';
+        setScanError(message);
+        setGroupedFiles([]);
+        setSelectedForReview([]);
+      }
       setIsScanning(false);
     }
-  }, [tieredClassifier]);
+  }, [manageStorageEnabled, runScan]);
+
+  const handleRescan = useCallback(async () => {
+    if (lastTreeUri != null) {
+      await runScan(lastTreeUri);
+    }
+  }, [lastTreeUri, runScan]);
+
+  if (permissionStatus !== 'none') {
+    return (
+      <PermissionNeededScreen
+        permissionStatus={permissionStatus}
+        safeAreaInsets={safeAreaInsets}
+        onOpenSettings={handleOpenSettings}
+        onDismiss={() => setPermissionStatus('none')}
+      />
+    );
+  }
 
   return (
     <ScrollView
@@ -154,13 +256,41 @@ function AppContent() {
         </Text>
       </View>
 
+      <View style={styles.settingsCard}>
+        <View style={styles.settingHeader}>
+          <Text style={styles.settingTitle}>Full storage access</Text>
+          <Switch
+            testID="manage-storage-toggle"
+            value={manageStorageEnabled}
+            onValueChange={handleManageStorageToggle}
+          />
+        </View>
+        <Text style={styles.warningText}>
+          Play Store policy: MANAGE_EXTERNAL_STORAGE is a restricted permission
+          intended for file-manager apps. Enable only if you need to traverse
+          Android/data or Android/obb directories. The app will redirect you to
+          system settings to grant this permission.
+        </Text>
+      </View>
+
       <View style={styles.scanButtonContainer}>
         <Button
-          title={isScanning ? 'Scanning…' : 'Scan Folder'}
+          title={isScanning ? 'Scanning…' : 'Choose Folder & Scan'}
           onPress={handleScan}
           disabled={isScanning}
         />
       </View>
+
+      {lastTreeUri != null && !isScanning ? (
+        <TouchableOpacity
+          testID="rescan-button"
+          style={styles.rescanButton}
+          onPress={handleRescan}>
+          <Text style={styles.rescanText}>
+            ↩ Re-scan last folder
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {isScanning ? <ActivityIndicator style={styles.loading} /> : null}
       <Text testID="classifier-diagnostic" style={styles.diagnosticText}>
@@ -205,6 +335,47 @@ function AppContent() {
   );
 }
 
+interface PermissionNeededScreenProps {
+  permissionStatus: PermissionStatus;
+  safeAreaInsets: {top: number; bottom: number};
+  onOpenSettings: () => void;
+  onDismiss: () => void;
+}
+
+function PermissionNeededScreen({
+  permissionStatus,
+  safeAreaInsets,
+  onOpenSettings,
+  onDismiss,
+}: PermissionNeededScreenProps) {
+  const isSafDenied = permissionStatus === 'saf_denied';
+  const title = isSafDenied ? 'Folder access needed' : 'Full storage access needed';
+  const description = isSafDenied
+    ? 'FileSage needs permission to read the selected folder. Please grant folder access when prompted, or open system settings to adjust app permissions.'
+    : 'MANAGE_EXTERNAL_STORAGE is required to scan restricted directories (Android/data, Android/obb). Tap "Open Settings" to grant this permission.';
+
+  return (
+    <View
+      testID="permission-screen"
+      style={[
+        styles.permissionScreen,
+        {
+          paddingTop: safeAreaInsets.top + 24,
+          paddingBottom: safeAreaInsets.bottom + 24,
+        },
+      ]}>
+      <Text style={styles.permissionTitle}>{title}</Text>
+      <Text style={styles.permissionDescription}>{description}</Text>
+      <View style={styles.permissionActions}>
+        <Button title="Open Settings" onPress={onOpenSettings} />
+        <TouchableOpacity onPress={onDismiss} style={styles.dismissButton}>
+          <Text style={styles.dismissText}>Not now</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 16,
@@ -239,6 +410,14 @@ const styles = StyleSheet.create({
   },
   scanButtonContainer: {
     marginTop: 4,
+  },
+  rescanButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  rescanText: {
+    color: '#2563eb',
+    fontSize: 14,
   },
   loading: {
     marginVertical: 8,
@@ -292,6 +471,33 @@ const styles = StyleSheet.create({
   },
   reviewItem: {
     color: '#111827',
+  },
+  permissionScreen: {
+    flex: 1,
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  permissionDescription: {
+    color: '#4b5563',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  permissionActions: {
+    gap: 12,
+    marginTop: 8,
+  },
+  dismissButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  dismissText: {
+    color: '#6b7280',
+    fontSize: 14,
   },
 });
 

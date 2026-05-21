@@ -3,7 +3,10 @@ package com.filesage.modules
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.Settings
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -65,6 +68,15 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
     ioExecutor.execute {
       try {
         val treeUri = Uri.parse(treeUriString)
+        val scheme = treeUri.scheme
+        if (scheme != "content") {
+          promise.reject(
+            "E_UNSUPPORTED_URI_SCHEME",
+            "URI scheme '${scheme ?: "null"}' is not supported; only SAF content URIs (scheme 'content') are accepted.",
+          )
+          return@execute
+        }
+
         if (!DocumentsContract.isTreeUri(treeUri)) {
           promise.reject("E_INVALID_TREE_URI", "Provided URI is not a valid SAF tree URI.")
           return@execute
@@ -107,6 +119,65 @@ class FileScannerModule(private val reactContext: ReactApplicationContext) :
     } catch (securityException: SecurityException) {
       promise.reject("E_PERSIST_PERMISSION_FAILED", "Failed to persist SAF permission.", securityException)
     }
+  }
+
+  /**
+   * Opens the system settings screen that lets the user grant
+   * MANAGE_EXTERNAL_STORAGE (Android 11+ / API 30+).
+   * On Android < 11 this resolves immediately because the permission is
+   * automatically available through READ_EXTERNAL_STORAGE.
+   */
+  @ReactMethod
+  fun requestManageExternalStorage(promise: Promise) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      promise.resolve(null)
+      return
+    }
+    if (Environment.isExternalStorageManager()) {
+      promise.resolve(null)
+      return
+    }
+    val activity = reactApplicationContext.currentActivity
+    if (activity == null) {
+      promise.reject(
+        "E_NO_ACTIVITY",
+        "Cannot request MANAGE_EXTERNAL_STORAGE without an active Activity.",
+      )
+      return
+    }
+    try {
+      val intent =
+        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+          data = Uri.fromParts("package", reactApplicationContext.packageName, null)
+        }
+      activity.startActivity(intent)
+      promise.resolve(null)
+    } catch (error: Exception) {
+      try {
+        activity.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        promise.resolve(null)
+      } catch (fallback: Exception) {
+        promise.reject(
+          "E_PERMISSION_REQUEST_FAILED",
+          "Unable to open MANAGE_EXTERNAL_STORAGE settings.",
+          fallback,
+        )
+      }
+    }
+  }
+
+  /**
+   * Returns true when the app holds MANAGE_EXTERNAL_STORAGE on Android 11+,
+   * or true on earlier API levels where the permission is automatically
+   * available through READ_EXTERNAL_STORAGE.
+   */
+  @ReactMethod
+  fun checkManageExternalStorageGranted(promise: Promise) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      promise.resolve(true)
+      return
+    }
+    promise.resolve(Environment.isExternalStorageManager())
   }
 
   override fun onNewIntent(intent: Intent) = Unit
