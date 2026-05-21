@@ -21,6 +21,7 @@ import {aicoreClassifier} from './src/classify/aicoreClassifier';
 import {cloudClassifier} from './src/classify/cloudClassifier';
 import {mediapipeClassifier} from './src/classify/mediapipeClassifier';
 import {createTieredClassifier} from './src/classify/tieredClassifier';
+import {batchMove, BatchMoveProgressEvent} from './src/move/batchMove';
 import {isOlderThanThreshold} from './src/preprocess/ageFilter';
 import {
   EXTENSION_BUCKETS,
@@ -51,6 +52,24 @@ interface ScannedFileViewModel {
   badges: ReviewBadge[];
 }
 
+interface BucketGroupViewModel {
+  bucket: ExtensionBucket;
+  files: ScannedFileViewModel[];
+}
+
+interface MoveProgressState {
+  total: number;
+  processed: number;
+  moved: number;
+  currentFileName: string | null;
+}
+
+interface MoveReportState {
+  total: number;
+  moved: number;
+  errors: Array<{uri: string; name: string; message: string}>;
+}
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
@@ -73,10 +92,12 @@ function AppContent() {
   const [classifierDiagnostic, setClassifierDiagnostic] = useState(
     'Classifier diagnostics unavailable until first scan.',
   );
-  const [groupedFiles, setGroupedFiles] = useState<
-    Array<{bucket: ExtensionBucket; files: ScannedFileViewModel[]}>
-  >([]);
+  const [groupedFiles, setGroupedFiles] = useState<BucketGroupViewModel[]>([]);
   const [selectedForReview, setSelectedForReview] = useState<ScannedFileViewModel[]>([]);
+  const [isMoveConfirmationVisible, setIsMoveConfirmationVisible] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
+  const [moveProgress, setMoveProgress] = useState<MoveProgressState | null>(null);
+  const [moveReport, setMoveReport] = useState<MoveReportState | null>(null);
 
   const tieredClassifier = useMemo(
     () =>
@@ -115,6 +136,9 @@ function AppContent() {
       setIsScanning(true);
       setScanError(null);
       setPermissionStatus('none');
+      setIsMoveConfirmationVisible(false);
+      setMoveProgress(null);
+      setMoveReport(null);
 
       try {
         const scannedFiles = await scanTree(treeUri);
@@ -158,6 +182,75 @@ function AppContent() {
     },
     [tieredClassifier],
   );
+
+  const bucketCounts = useMemo(
+    () =>
+      groupedFiles.map(group => ({
+        bucket: group.bucket,
+        count: group.files.length,
+      })),
+    [groupedFiles],
+  );
+  const totalFilesToMove = useMemo(
+    () => bucketCounts.reduce((sum, group) => sum + group.count, 0),
+    [bucketCounts],
+  );
+
+  const handleMoveProgress = useCallback((event: BatchMoveProgressEvent) => {
+    setMoveProgress({
+      total: event.total,
+      processed: event.processed,
+      moved: event.moved,
+      currentFileName: event.file.name,
+    });
+  }, []);
+
+  const handleConfirmMove = useCallback(async () => {
+    if (lastTreeUri == null || totalFilesToMove === 0) {
+      return;
+    }
+
+    setIsMoveConfirmationVisible(false);
+    setIsMoving(true);
+    setMoveReport(null);
+    setMoveProgress({
+      total: totalFilesToMove,
+      processed: 0,
+      moved: 0,
+      currentFileName: null,
+    });
+
+    try {
+      const result = await batchMove(groupedFiles, lastTreeUri, {
+        onProgress: handleMoveProgress,
+      });
+      const movedUris = new Set(result.moved.map(item => item.file.uri));
+
+      setGroupedFiles(currentGroups => removeMovedFilesFromGroups(currentGroups, movedUris));
+      setSelectedForReview(currentFiles =>
+        currentFiles.filter(file => !movedUris.has(file.uri)),
+      );
+      setMoveReport({
+        total: result.total,
+        moved: result.moved.length,
+        errors: result.errors.map(({file, error}) => ({
+          uri: file.uri,
+          name: file.name,
+          message: error.message,
+        })),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Batch move failed.';
+      setMoveReport({
+        total: totalFilesToMove,
+        moved: 0,
+        errors: [{uri: 'batch', name: 'Batch move', message}],
+      });
+    } finally {
+      setIsMoving(false);
+      setMoveProgress(null);
+    }
+  }, [groupedFiles, handleMoveProgress, lastTreeUri, totalFilesToMove]);
 
   const handleScan = useCallback(async () => {
     setIsScanning(true);
@@ -235,7 +328,9 @@ function AppContent() {
         },
       ]}>
       <Text style={styles.title}>FileSage DownloadSorter</Text>
-      <Text style={styles.subtitle}>Read-only scan for any selected folder</Text>
+      <Text style={styles.subtitle}>
+        Scan a folder, then move classified files into bucket folders.
+      </Text>
 
       <View style={styles.settingsCard}>
         <View style={styles.settingHeader}>
@@ -273,7 +368,7 @@ function AppContent() {
         <Button
           title={isScanning ? 'Scanning…' : 'Choose Folder & Scan'}
           onPress={handleScan}
-          disabled={isScanning}
+          disabled={isScanning || isMoving}
         />
       </View>
 
@@ -281,6 +376,7 @@ function AppContent() {
         <TouchableOpacity
           testID="rescan-button"
           style={styles.rescanButton}
+          disabled={isMoving}
           onPress={handleRescan}>
           <Text style={styles.rescanText}>
             ↩ Re-scan last folder
@@ -293,6 +389,74 @@ function AppContent() {
         {classifierDiagnostic}
       </Text>
       {scanError ? <Text style={styles.errorText}>{scanError}</Text> : null}
+
+      {totalFilesToMove > 0 || moveProgress != null || moveReport != null ? (
+        <View style={styles.moveCard}>
+          {totalFilesToMove > 0 ? (
+            <Button
+              title={`Move ${totalFilesToMove} files`}
+              onPress={() => setIsMoveConfirmationVisible(true)}
+              disabled={isMoving || isScanning}
+            />
+          ) : null}
+
+          {isMoveConfirmationVisible ? (
+            <View testID="move-confirmation-sheet" style={styles.confirmationSheet}>
+              <Text style={styles.confirmationTitle}>Move {totalFilesToMove} files?</Text>
+              <Text style={styles.confirmationSubtitle}>
+                FileSage will create bucket folders if needed, then move each classified
+                file into its bucket.
+              </Text>
+              {bucketCounts.map(group => (
+                <Text key={`confirm-${group.bucket}`} style={styles.confirmationItem}>
+                  • {group.bucket}: {group.count}
+                </Text>
+              ))}
+              <View style={styles.confirmationActions}>
+                <Button
+                  title="Cancel"
+                  onPress={() => setIsMoveConfirmationVisible(false)}
+                />
+                <Button title="Move now" onPress={handleConfirmMove} />
+              </View>
+            </View>
+          ) : null}
+
+          {isMoving && moveProgress != null ? (
+            <View style={styles.progressCard}>
+              <Text style={styles.progressTitle}>
+                {moveProgress.moved}/{moveProgress.total} files moved
+              </Text>
+              <Text style={styles.progressText}>
+                Processed {moveProgress.processed} of {moveProgress.total}
+              </Text>
+              {moveProgress.currentFileName != null ? (
+                <Text style={styles.progressText}>
+                  Working on: {moveProgress.currentFileName}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {moveReport != null ? (
+            <View style={styles.reportCard}>
+              <Text style={styles.reportTitle}>Move report</Text>
+              <Text style={styles.reportSummary}>
+                {moveReport.moved}/{moveReport.total} files moved
+              </Text>
+              {moveReport.errors.length === 0 ? (
+                <Text style={styles.reportSuccess}>All selected files were moved.</Text>
+              ) : (
+                moveReport.errors.map(error => (
+                  <Text key={`move-error-${error.uri}`} style={styles.reportError}>
+                    • {error.name}: {error.message}
+                  </Text>
+                ))
+              )}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Grouped by bucket</Text>
       {groupedFiles.length === 0 ? (
@@ -383,6 +547,71 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#4b5563',
+  },
+  moveCard: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    padding: 12,
+    gap: 12,
+  },
+  confirmationSheet: {
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    gap: 8,
+  },
+  confirmationTitle: {
+    color: '#111827',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  confirmationSubtitle: {
+    color: '#4b5563',
+    lineHeight: 20,
+  },
+  confirmationItem: {
+    color: '#111827',
+  },
+  confirmationActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  progressCard: {
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    padding: 12,
+    gap: 4,
+  },
+  progressTitle: {
+    color: '#1d4ed8',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  progressText: {
+    color: '#1f2937',
+  },
+  reportCard: {
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    gap: 6,
+  },
+  reportTitle: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reportSummary: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  reportSuccess: {
+    color: '#166534',
+  },
+  reportError: {
+    color: '#b91c1c',
   },
   settingsCard: {
     borderWidth: 1,
@@ -570,7 +799,7 @@ function buildBadges(
 
 function groupFilesByBucket(
   files: ScannedFileViewModel[],
-): Array<{bucket: ExtensionBucket; files: ScannedFileViewModel[]}> {
+): BucketGroupViewModel[] {
   const grouped = new Map<ExtensionBucket, ScannedFileViewModel[]>();
   for (const file of files) {
     const current = grouped.get(file.bucket);
@@ -583,6 +812,18 @@ function groupFilesByBucket(
 
   return BUCKET_ORDER
     .map(bucket => ({bucket, files: grouped.get(bucket) ?? []}))
+    .filter(group => group.files.length > 0);
+}
+
+function removeMovedFilesFromGroups(
+  groups: BucketGroupViewModel[],
+  movedUris: Set<string>,
+): BucketGroupViewModel[] {
+  return groups
+    .map(group => ({
+      bucket: group.bucket,
+      files: group.files.filter(file => !movedUris.has(file.uri)),
+    }))
     .filter(group => group.files.length > 0);
 }
 

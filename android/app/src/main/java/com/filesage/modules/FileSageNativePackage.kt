@@ -10,6 +10,7 @@ class FileSageNativePackage : ReactPackage {
     listOf(
       FileScannerModule(reactContext),
       FolderManagerModule(reactContext),
+      FileMoverModule(reactContext),
       HashingModule(reactContext),
       AICoreClassifierModule(reactContext),
       MediaPipeClassifierModule(reactContext),

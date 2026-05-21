@@ -14,6 +14,7 @@ import {
   classifyTextWithMediaPipe,
   isMediaPipeModelAvailable,
 } from '../../src/native/MediaPipeClassifier';
+import {moveDocument} from '../../src/native/fileMover';
 
 describe('native bridge modules', () => {
   afterEach(() => {
@@ -21,6 +22,7 @@ describe('native bridge modules', () => {
     delete (NativeModules as Record<string, unknown>).HashingModule;
     delete (NativeModules as Record<string, unknown>).AICoreClassifierModule;
     delete (NativeModules as Record<string, unknown>).MediaPipeClassifierModule;
+    delete (NativeModules as Record<string, unknown>).FileMoverModule;
   });
 
   it('delegates FileScanner calls to FileScannerModule', async () => {
@@ -128,6 +130,29 @@ describe('native bridge modules', () => {
     );
   });
 
+  it('delegates file moves to FileMoverModule', async () => {
+    const moveDocumentMock = jest
+      .fn()
+      .mockResolvedValue('content://tree/Docs/document/primary%3ADocs%2Finvoice.pdf');
+
+    (NativeModules as Record<string, unknown>).FileMoverModule = {
+      moveDocument: moveDocumentMock,
+    };
+
+    await expect(
+      moveDocument(
+        'content://tree/root/document/primary%3ADownload%2Finvoice.pdf',
+        'content://tree/Docs',
+        'invoice.pdf',
+      ),
+    ).resolves.toBe('content://tree/Docs/document/primary%3ADocs%2Finvoice.pdf');
+    expect(moveDocumentMock).toHaveBeenCalledWith(
+      'content://tree/root/document/primary%3ADownload%2Finvoice.pdf',
+      'content://tree/Docs',
+      'invoice.pdf',
+    );
+  });
+
   it('throws a clear error when native modules are unavailable', async () => {
     await expect(requestDownloadsTreePermission()).rejects.toThrow(
       'FileScannerModule is not available on this platform.',
@@ -141,5 +166,12 @@ describe('native bridge modules', () => {
     await expect(isAICoreAvailable()).rejects.toThrow(
       'AICoreClassifierModule is not available on this platform.',
     );
+    await expect(
+      moveDocument(
+        'content://tree/root/document/primary%3ADownload%2Finvoice.pdf',
+        'content://tree/Docs',
+        'invoice.pdf',
+      ),
+    ).rejects.toThrow('FileMoverModule is not available on this platform.');
   });
 });
