@@ -6,6 +6,10 @@ import {mediapipeClassifier} from '../classify/mediapipeClassifier';
 import {createTieredClassifier} from '../classify/tieredClassifier';
 import {requestTreePermission, scanTree, sha256} from '../native';
 import {NativeScannedFileMetadata} from '../native/types';
+import {batchMove, BatchMoveGroup, BatchMoveResult} from '../move/batchMove';
+import {CollisionPolicy, DEFAULT_COLLISION_POLICY} from '../move/collisionPolicy';
+import {loadJournal} from '../move/moveJournal';
+import {undoLastMove} from '../move/undoMove';
 import {isOlderThanThreshold} from '../preprocess/ageFilter';
 import {ExtensionBucket, extensionToBucket} from '../preprocess/extensionBuckets';
 import {PickFolderScreen} from './PickFolderScreen';
@@ -23,7 +27,7 @@ const BUCKET_ORDER: ExtensionBucket[] = [
   'Other',
 ];
 
-type ScreenState = 'pick' | 'scan' | 'review';
+type ScreenState = 'pick' | 'scan' | 'review' | 'move';
 
 interface ScanFlowProps {
   isDarkMode: boolean;
@@ -42,6 +46,13 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<ExtensionBucket>>(
     new Set(),
   );
+  const [selectedTreeUri, setSelectedTreeUri] = useState<string | null>(null);
+  const [collisionPolicy, setCollisionPolicy] = useState<CollisionPolicy>(
+    DEFAULT_COLLISION_POLICY,
+  );
+  const [moveResult, setMoveResult] = useState<BatchMoveResult | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [canUndo, setCanUndo] = useState(() => loadJournal() != null);
 
   const tieredClassifier = useMemo(
     () =>
@@ -77,6 +88,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
         throw new Error('Permission is required to scan a folder.');
       }
 
+      setSelectedTreeUri(treeUri);
       const scannedFiles = await scanTree(treeUri);
       const fileHashes = await hashFiles(scannedFiles);
       const duplicateUris = findDuplicateUris(fileHashes);
@@ -114,6 +126,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       setGroupedFiles([]);
       setSelectedUris(new Set());
       setCollapsedBuckets(new Set());
+      setSelectedTreeUri(null);
       setScreen('pick');
     }
   }, [tieredClassifier]);
@@ -142,7 +155,50 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
     });
   }, []);
 
-  if (screen === 'scan') {
+  const handleMove = useCallback(async () => {
+    if (selectedTreeUri == null) {
+      return;
+    }
+
+    setMoveError(null);
+    setMoveResult(null);
+    setScreen('move');
+
+    const groups: BatchMoveGroup[] = groupedFiles
+      .map(group => ({
+        bucket: group.bucket,
+        files: group.files
+          .filter(file => selectedUris.has(file.uri))
+          .map(file => ({uri: file.uri, name: file.name, bucket: file.bucket})),
+      }))
+      .filter(group => group.files.length > 0);
+
+    try {
+      const result = await batchMove(groups, selectedTreeUri, {collisionPolicy});
+      setMoveResult(result);
+      setCanUndo(loadJournal() != null);
+    } catch (error: unknown) {
+      setMoveError(error instanceof Error ? error.message : 'Move failed.');
+    }
+
+    setScreen('review');
+  }, [selectedTreeUri, groupedFiles, selectedUris, collisionPolicy]);
+
+  const handleUndo = useCallback(async () => {
+    setMoveError(null);
+    setScreen('move');
+
+    try {
+      await undoLastMove();
+      setCanUndo(loadJournal() != null);
+    } catch (error: unknown) {
+      setMoveError(error instanceof Error ? error.message : 'Undo failed.');
+    }
+
+    setScreen('review');
+  }, []);
+
+  if (screen === 'scan' || screen === 'move') {
     return (
       <ScanProgressScreen
         classifierDiagnostic={classifierDiagnostic}
@@ -154,12 +210,19 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   if (screen === 'review') {
     return (
       <ReviewScreen
+        canUndo={canUndo}
         collapsedBuckets={collapsedBuckets}
+        collisionPolicy={collisionPolicy}
         groupedFiles={groupedFiles}
         isDarkMode={isDarkMode}
+        moveError={moveError}
+        moveResult={moveResult}
+        onCollisionPolicyChange={setCollisionPolicy}
+        onMove={selectedTreeUri != null ? handleMove : undefined}
         onRescan={handleScan}
         onToggleBucketCollapsed={handleToggleBucketCollapsed}
         onToggleFileSelected={handleToggleFileSelected}
+        onUndo={canUndo ? handleUndo : undefined}
         selectedUris={selectedUris}
       />
     );

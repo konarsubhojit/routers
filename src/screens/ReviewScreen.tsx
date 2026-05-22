@@ -2,26 +2,48 @@ import React, {useMemo} from 'react';
 import {Button, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
+import {CollisionPolicy} from '../move/collisionPolicy';
+import {BatchMoveResult} from '../move/batchMove';
 import {ExtensionBucket} from '../preprocess/extensionBuckets';
 import {BucketGroup, ScannedFileViewModel} from './types';
 import {EmptyState} from './StatusStates';
 
 interface ReviewScreenProps {
+  canUndo?: boolean;
   groupedFiles: BucketGroup[];
   isDarkMode: boolean;
+  collisionPolicy: CollisionPolicy;
+  moveError?: string | null;
+  moveResult?: BatchMoveResult | null;
+  onCollisionPolicyChange: (policy: CollisionPolicy) => void;
+  onMove?: () => void;
   onRescan: () => void;
   onToggleBucketCollapsed: (bucket: ExtensionBucket) => void;
   onToggleFileSelected: (uri: string) => void;
+  onUndo?: () => void;
   selectedUris: Set<string>;
   collapsedBuckets: Set<ExtensionBucket>;
 }
 
+const COLLISION_POLICIES: {value: CollisionPolicy; label: string}[] = [
+  {value: 'rename', label: 'Rename'},
+  {value: 'skip', label: 'Skip'},
+  {value: 'overwrite', label: 'Overwrite'},
+];
+
 export function ReviewScreen({
+  canUndo,
   groupedFiles,
   isDarkMode,
+  collisionPolicy,
+  moveError,
+  moveResult,
+  onCollisionPolicyChange,
+  onMove,
   onRescan,
   onToggleBucketCollapsed,
   onToggleFileSelected,
+  onUndo,
   selectedUris,
   collapsedBuckets,
 }: ReviewScreenProps) {
@@ -127,6 +149,64 @@ export function ReviewScreen({
           </Text>
         ))
       )}
+
+      <Text style={[styles.sectionTitle, palette.textPrimary]}>
+        Collision policy
+      </Text>
+      <View style={styles.policyRow}>
+        {COLLISION_POLICIES.map(({value, label}) => (
+          <Pressable
+            key={value}
+            testID={`collision-policy-${value}`}
+            onPress={() => onCollisionPolicyChange(value)}
+            style={[
+              styles.policyChip,
+              collisionPolicy === value ? palette.policyChipActive : palette.policyChipIdle,
+            ]}>
+            <Text
+              style={[
+                styles.policyChipText,
+                collisionPolicy === value
+                  ? palette.policyChipTextActive
+                  : palette.policyChipTextIdle,
+              ]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {moveError != null ? (
+        <Text style={styles.moveErrorText}>{moveError}</Text>
+      ) : null}
+
+      {moveResult != null ? (
+        <Text
+          testID="move-result-summary"
+          style={[styles.moveSummaryText, palette.textMuted]}>
+          {`Last move: ${moveResult.moved.length} moved` +
+            (moveResult.skipped.length > 0
+              ? `, ${moveResult.skipped.length} skipped`
+              : '') +
+            (moveResult.errors.length > 0
+              ? `, ${moveResult.errors.length} failed`
+              : '')}
+        </Text>
+      ) : null}
+
+      <View style={styles.actionRow}>
+        {onMove != null ? (
+          <Button
+            testID="move-selected-button"
+            title={`Move ${selectedForReview.length} selected file${selectedForReview.length !== 1 ? 's' : ''}`}
+            disabled={selectedForReview.length === 0}
+            onPress={onMove}
+          />
+        ) : null}
+        {canUndo && onUndo != null ? (
+          <Button testID="undo-last-move-button" title="Undo last move" onPress={onUndo} />
+        ) : null}
+      </View>
     </ScrollView>
   );
 }
@@ -217,6 +297,34 @@ const styles = StyleSheet.create({
   scanButtonContainer: {
     marginTop: 4,
   },
+  policyRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  policyChip: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  policyChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  moveErrorText: {
+    color: '#ef4444',
+    fontSize: 13,
+  },
+  moveSummaryText: {
+    fontSize: 13,
+  },
 });
 
 const lightStyles = StyleSheet.create({
@@ -245,6 +353,20 @@ const lightStyles = StyleSheet.create({
   checkboxUnselected: {
     color: '#9ca3af',
   },
+  policyChipActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#0284c7',
+  },
+  policyChipIdle: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d1d5db',
+  },
+  policyChipTextActive: {
+    color: '#ffffff',
+  },
+  policyChipTextIdle: {
+    color: '#374151',
+  },
 });
 
 const darkStyles = StyleSheet.create({
@@ -272,5 +394,19 @@ const darkStyles = StyleSheet.create({
   },
   checkboxUnselected: {
     color: '#6b7280',
+  },
+  policyChipActive: {
+    backgroundColor: '#0ea5e9',
+    borderColor: '#0ea5e9',
+  },
+  policyChipIdle: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+  },
+  policyChipTextActive: {
+    color: '#ffffff',
+  },
+  policyChipTextIdle: {
+    color: '#d1d5db',
   },
 });
