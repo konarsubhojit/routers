@@ -31,6 +31,8 @@ export interface BatchMoveProgressEvent {
 export interface BatchMoveSuccess {
   file: BatchMoveFile;
   destinationUri: string;
+  /** The actual display name used for the move (may differ from file.name when renamed). */
+  resolvedName: string;
 }
 
 export interface BatchMoveSkip {
@@ -126,6 +128,7 @@ export async function batchMove(
       const maxAttempts =
         collisionPolicy === 'rename' ? MAX_RENAME_ATTEMPTS + 1 : 1;
       let destinationUri: string | null = null;
+      let resolvedName = file.name;
       let fileSkipped = false;
       let fileError: Error | null = null;
 
@@ -139,6 +142,7 @@ export async function batchMove(
             destinationBucketUri,
             targetName,
           );
+          resolvedName = targetName;
           break;
         } catch (error) {
           if (isNameConflict(error)) {
@@ -156,7 +160,7 @@ export async function batchMove(
       }
 
       if (destinationUri != null) {
-        moved.push({file, destinationUri});
+        moved.push({file, destinationUri, resolvedName});
         emitProgress(file, 'moved');
       } else if (fileSkipped) {
         skipped.push({file});
@@ -173,6 +177,7 @@ export async function batchMove(
     sourceUri: success.file.uri,
     destinationUri: success.destinationUri,
     name: success.file.name,
+    resolvedName: success.resolvedName,
   }));
   dependencies.saveJournal(journalEntries);
 

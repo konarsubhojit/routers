@@ -108,9 +108,9 @@ describe('batchMove', () => {
     expect(saveJournal).toHaveBeenCalledTimes(1);
     expect(saveJournal).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({sourceUri: 'content://docs/1', name: 'invoice.pdf'}),
-        expect.objectContaining({sourceUri: 'content://images/1', name: 'photo.jpg'}),
-        expect.objectContaining({sourceUri: 'content://images/2', name: 'cover.png'}),
+        expect.objectContaining({sourceUri: 'content://docs/1', name: 'invoice.pdf', resolvedName: 'invoice.pdf'}),
+        expect.objectContaining({sourceUri: 'content://images/1', name: 'photo.jpg', resolvedName: 'photo.jpg'}),
+        expect.objectContaining({sourceUri: 'content://images/2', name: 'cover.png', resolvedName: 'cover.png'}),
       ]),
     );
   });
@@ -389,6 +389,7 @@ describe('batchMove', () => {
         sourceUri: 'content://docs/1',
         destinationUri: 'content://docs/1/moved',
         name: 'a.pdf',
+        resolvedName: 'a.pdf',
       });
     });
   });

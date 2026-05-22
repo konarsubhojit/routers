@@ -5,6 +5,13 @@ export interface JournalEntry {
   destinationUri: string;
   /** Original display name of the file. */
   name: string;
+  /**
+   * The actual display name used during the move.  Differs from `name` when
+   * the 'rename' collision policy was applied (e.g. "invoice (1).pdf").
+   * Stored for audit/display purposes; undo operations use `name` so that the
+   * file is restored with its original name in its original directory.
+   */
+  resolvedName: string;
 }
 
 export interface MoveJournal {

@@ -81,6 +81,7 @@ describe('undoLastMove', () => {
       destinationUri:
         'content://com.android.externalstorage.documents/document/primary%3ADownload%2FDocs%2Finvoice.pdf',
       name: 'invoice.pdf',
+      resolvedName: 'invoice.pdf',
     };
     const moveDocument = jest
       .fn()
@@ -119,6 +120,7 @@ describe('undoLastMove', () => {
       destinationUri:
         'content://com.android.externalstorage.documents/document/primary%3ADocs%2Fa.pdf',
       name: 'a.pdf',
+      resolvedName: 'a.pdf',
     };
     const badEntry: JournalEntry = {
       sourceUri:
@@ -126,6 +128,7 @@ describe('undoLastMove', () => {
       destinationUri:
         'content://com.android.externalstorage.documents/document/primary%3ADocs%2Fb.pdf',
       name: 'b.pdf',
+      resolvedName: 'b.pdf',
     };
     const moveDocument = jest.fn().mockImplementation(
       async (sourceUri: string) => {
@@ -158,6 +161,7 @@ describe('undoLastMove', () => {
       sourceUri: 'not-a-valid-uri',
       destinationUri: 'content://somewhere/document/primary%3Adest.pdf',
       name: 'dest.pdf',
+      resolvedName: 'dest.pdf',
     };
     const moveDocument = jest.fn();
     const loadJournal = jest.fn().mockReturnValue(makeJournal([entry]));
