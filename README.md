@@ -30,6 +30,19 @@ To run on Android (with emulator/device configured):
 npm run android
 ```
 
+In-app flow (write mode v2):
+
+1. Tap **Scan Folder** and choose a folder in the Android SAF picker.
+2. Wait for scan + classification to complete, then review grouped files.
+3. Select files, choose a collision policy (`Rename`, `Skip`, `Overwrite`), and tap **Move**.
+4. Optionally use **Undo last move** to replay the latest move batch in reverse.
+
+## Screenshots (placeholder)
+
+- `docs/screenshots/01-choose-folder.png` — Choose folder (SAF picker)
+- `docs/screenshots/02-scan-review.png` — Scan results + selected files
+- `docs/screenshots/03-move-summary.png` — Move summary + undo action
+
 ## Manual Android test (folder scan + hashing)
 
 These steps must be run on an Android emulator/device (not in CI):
