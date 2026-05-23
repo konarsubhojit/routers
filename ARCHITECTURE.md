@@ -75,9 +75,11 @@ undoLastMove -> UI: restored/errors summary (journal cleared)
 - Native move first attempts `DocumentsContract.moveDocument`; if unavailable, it falls
   back to copy-then-delete with cleanup on partial failure.
 - Collision policies:
-  - `rename` (default): retries with `name (1)` ... `name (99)` before failing.
+  - `rename` (default): retries with `name (1)` ... `name (99)` before failing
+    (`MAX_RENAME_ATTEMPTS = 99`).
   - `skip`: treats name conflict as skipped file.
-  - `overwrite`: currently does **not** replace existing files; conflicts are surfaced as errors.
+  - `overwrite` (current behavior): does **not** replace existing files yet; name
+    conflicts are surfaced as errors and processing continues.
 
 ### Undo semantics and limitations
 
