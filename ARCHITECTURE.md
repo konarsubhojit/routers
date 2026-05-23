@@ -41,23 +41,23 @@ DownloadSorter is a React Native (TypeScript) app with Kotlin Android native mod
 ```text
 User -> UI: Choose folder
 UI -> FileScannerModule: requestTreePermission()
-FileScannerModule --> UI: selectedTreeUri (persisted SAF grant)
+FileScannerModule -> UI: selectedTreeUri (persisted SAF grant)
 UI -> FileScannerModule: scanTree(selectedTreeUri)
-FileScannerModule --> UI: scanned files
+FileScannerModule -> UI: scanned files
 UI -> Classifier pipeline: bucket + badges + tiered classify
-Classifier pipeline --> UI: grouped review list
+Classifier pipeline -> UI: grouped review list
 User -> UI: Select files + collision policy + Move
 UI -> batchMove: batchMove(groups, selectedTreeUri, collisionPolicy)
 batchMove -> FolderManagerModule: ensureChildDirectory(treeUri, bucket)
-FolderManagerModule --> batchMove: destination bucket URI
+FolderManagerModule -> batchMove: destination bucket URI
 batchMove -> FileMoverModule: moveDocument(sourceUri, bucketUri, displayName)
-FileMoverModule --> batchMove: destinationUri | error
+FileMoverModule -> batchMove: destinationUri | error
 batchMove -> moveJournal: saveJournal(moved entries)
-batchMove --> UI: moved/skipped/errors summary
+batchMove -> UI: moved/skipped/errors summary
 User -> UI: Undo last move
 UI -> undoLastMove: replay last journal
 undoLastMove -> FileMoverModule: moveDocument(destinationUri, originalParentUri, originalName)
-undoLastMove --> UI: restored/errors summary (journal cleared)
+undoLastMove -> UI: restored/errors summary (journal cleared)
 ```
 
 ### Destination folders, naming, and creation rules

@@ -39,6 +39,8 @@ In-app flow (write mode v2):
 
 ## Screenshots (placeholder)
 
+Planned assets for follow-up docs/UI capture work (paths intentionally reserved):
+
 - `docs/screenshots/01-choose-folder.png` — Choose folder (SAF picker)
 - `docs/screenshots/02-scan-review.png` — Scan results + selected files
 - `docs/screenshots/03-move-summary.png` — Move summary + undo action
