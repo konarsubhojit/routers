@@ -76,11 +76,13 @@ undoLastMove -> UI: restored/errors summary (journal cleared)
   back to copy-then-delete with cleanup on partial failure.
 - Collision policies:
   - `rename` (default): tries the original name first, then retries with
-    `name (1)` ... `name (99)` (`MAX_RENAME_ATTEMPTS = 99`, total max attempts = 100).
+    `name (1)` ... `name (99)`. `MAX_RENAME_ATTEMPTS = 99` counts **retry**
+    attempts only (it excludes the initial original-name attempt), so total
+    max attempts per file is 100.
   - `skip`: treats name conflict as skipped file.
-  - `overwrite` (current behavior): label is present in the UI, but behavior is
-    currently fail-on-conflict (no replacement); name conflicts are surfaced as
-    errors and processing continues.
+  - `overwrite` (legacy label, current behavior): implementation is currently
+    equivalent to fail-on-conflict (no replacement); name conflicts are surfaced
+    as errors and processing continues.
 
 ### Undo semantics and limitations
 
