@@ -47,13 +47,13 @@ FileScannerModule -> UI: scanned files
 UI -> Classifier pipeline: bucket + badges + tiered classify
 Classifier pipeline -> UI: grouped review list
 User -> UI: Select files + collision policy + Move
-UI -> batchMove: batchMove(groups, selectedTreeUri, collisionPolicy)
-batchMove -> FolderManagerModule: ensureChildDirectory(treeUri, bucket)
-FolderManagerModule -> batchMove: destination bucket URI
-batchMove -> FileMoverModule: moveDocument(sourceUri, bucketUri, displayName)
-FileMoverModule -> batchMove: destinationUri | error
-batchMove -> moveJournal: saveJournal(moved entries)
-batchMove -> UI: moved/skipped/errors summary
+UI -> BatchMove: batchMove(groups, selectedTreeUri, collisionPolicy)
+BatchMove -> FolderManagerModule: ensureChildDirectory(treeUri, bucket)
+FolderManagerModule -> BatchMove: destination bucket URI
+BatchMove -> FileMoverModule: moveDocument(sourceUri, bucketUri, displayName)
+FileMoverModule -> BatchMove: destinationUri | error
+BatchMove -> moveJournal: saveJournal(moved entries)
+BatchMove -> UI: moved/skipped/errors summary
 User -> UI: Undo last move
 UI -> undoLastMove: replay last journal
 undoLastMove -> FileMoverModule: moveDocument(destinationUri, originalParentUri, originalName)
@@ -80,9 +80,9 @@ undoLastMove -> UI: restored/errors summary (journal cleared)
     attempts only (it excludes the initial original-name attempt), so total
     max attempts per file is 100.
   - `skip`: treats name conflict as skipped file.
-  - `overwrite` (legacy label, current behavior): implementation is currently
-    equivalent to fail-on-conflict (no replacement); name conflicts are surfaced
-    as errors and processing continues.
+  - `overwrite` (UI label only, current behavior): despite the label, implementation
+    is currently equivalent to fail-on-conflict (no replacement); name conflicts
+    are surfaced as errors and processing continues.
 
 ### Undo semantics and limitations
 
