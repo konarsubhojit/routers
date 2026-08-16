@@ -37,7 +37,6 @@ export interface ModelFileSystem {
     destPath: string,
     onProgress?: (progress: DownloadProgress) => void,
   ): Promise<ModelDownloadResult>;
-  readAsHex(path: string): Promise<string>;
   sha256Hex(path: string): Promise<string>;
   unlink(path: string): Promise<void>;
   moveFile(fromPath: string, toPath: string): Promise<void>;

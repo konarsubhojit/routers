@@ -141,7 +141,7 @@ export async function ensureModel(options: EnsureModelOptions): Promise<EnsureMo
  */
 async function findAnyValidCachedModel(
   fs: ModelFileSystem,
-  cacheDir: string,
+  _cacheDir: string,
 ): Promise<EnsureModelResult | null> {
   const listable = fs as ModelFileSystem & {listCachedModels?: () => Promise<string[]>};
   if (typeof listable.listCachedModels !== 'function') {
@@ -157,5 +157,3 @@ async function findAnyValidCachedModel(
 
   return null;
 }
-
-export * from './types';

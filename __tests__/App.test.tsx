@@ -27,6 +27,17 @@ jest.mock('../src/classify/cloudClassifier', () => ({
   },
 }));
 
+jest.mock('../src/settings', () => ({
+  appSettingsStore: {
+    load: jest.fn().mockResolvedValue({
+      cloudClassificationEnabled: false,
+      cloudGranularity: 'filename',
+      crashReportingEnabled: true,
+    }),
+    update: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 jest.mock('../src/classify/tieredClassifier', () => ({
   createTieredClassifier: jest.fn(() => ({
     classify: jest.fn(async ({path}: {path: string}) =>

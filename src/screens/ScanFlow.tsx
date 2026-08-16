@@ -1,6 +1,7 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {aicoreClassifier} from '../classify/aicoreClassifier';
+import {classifyWithCloudEscalation} from '../classify/cloudFallback';
 import {cloudClassifier} from '../classify/cloudClassifier';
 import {mediapipeClassifier} from '../classify/mediapipeClassifier';
 import {createTieredClassifier} from '../classify/tieredClassifier';
@@ -9,6 +10,8 @@ import {NativeScannedFileMetadata} from '../native/types';
 import {batchMove, BatchMoveGroup, BatchMoveResult} from '../move/batchMove';
 import {CollisionPolicy, DEFAULT_COLLISION_POLICY} from '../move/collisionPolicy';
 import {loadJournal} from '../move/moveJournal';
+import {CloudGranularity} from '../settings/appSettings';
+import {appSettingsStore} from '../settings';
 import {undoLastMove} from '../move/undoMove';
 import {isOlderThanThreshold} from '../preprocess/ageFilter';
 import {ExtensionBucket, extensionToBucket} from '../preprocess/extensionBuckets';
@@ -38,6 +41,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   const [scanError, setScanError] = useState<string | null>(null);
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
   const [cloudTierEnabled, setCloudTierEnabled] = useState(false);
+  const [cloudGranularity, setCloudGranularity] = useState<CloudGranularity>('filename');
   const [classifierDiagnostic, setClassifierDiagnostic] = useState(
     'Classifier diagnostics unavailable until first scan.',
   );
@@ -54,14 +58,33 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(() => loadJournal() != null);
 
-  const tieredClassifier = useMemo(
-    () =>
-      createTieredClassifier([
-        aicoreClassifier,
-        mediapipeClassifier,
-        ...(cloudTierEnabled ? [cloudClassifier] : []),
-      ]),
-    [cloudTierEnabled],
+  // Hydrate the opt-in toggle from the persisted setting (default OFF) on mount.
+  useEffect(() => {
+    let cancelled = false;
+    appSettingsStore.load().then(settings => {
+      if (!cancelled) {
+        setCloudTierEnabled(settings.cloudClassificationEnabled);
+        setCloudGranularity(settings.cloudGranularity);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleCloudTierEnabledChange = useCallback((value: boolean) => {
+    setCloudTierEnabled(value);
+    void appSettingsStore.update({cloudClassificationEnabled: value});
+  }, []);
+
+  const handleCloudGranularityChange = useCallback((value: CloudGranularity) => {
+    setCloudGranularity(value);
+    void appSettingsStore.update({cloudGranularity: value});
+  }, []);
+
+  const onDeviceClassifier = useMemo(
+    () => createTieredClassifier([aicoreClassifier, mediapipeClassifier]),
+    [],
   );
 
   const handleScan = useCallback(async () => {
@@ -96,8 +119,18 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       const fileModels = await Promise.all(
         scannedFiles.map(async file => {
           const name = getDisplayName(file);
-          const classification = await tieredClassifier.classify({path: name});
-          const badges = buildBadges(file, duplicateUris, classification === 'TEMPORARY');
+          const {classification, tier} = await classifyWithCloudEscalation(
+            {path: name, sizeBytes: file.sizeBytes ?? undefined, mimeType: file.mimeType ?? undefined},
+            onDeviceClassifier,
+            cloudClassifier,
+            {cloudTierEnabled},
+          );
+          const badges = buildBadges(
+            file,
+            duplicateUris,
+            classification === 'TEMPORARY',
+            tier === 'cloud',
+          );
 
           return {
             uri: file.uri,
@@ -129,7 +162,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       setSelectedTreeUri(null);
       setScreen('pick');
     }
-  }, [tieredClassifier]);
+  }, [onDeviceClassifier, cloudTierEnabled]);
 
   const handleToggleFileSelected = useCallback((uri: string) => {
     setSelectedUris(current => {
@@ -231,10 +264,12 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   return (
     <PickFolderScreen
       classifierDiagnostic={classifierDiagnostic}
+      cloudGranularity={cloudGranularity}
       cloudTierEnabled={cloudTierEnabled}
       errorMessage={scanError}
       isDarkMode={isDarkMode}
-      onCloudTierEnabledChange={setCloudTierEnabled}
+      onCloudGranularityChange={handleCloudGranularityChange}
+      onCloudTierEnabledChange={handleCloudTierEnabledChange}
       onScan={handleScan}
       permissionMessage={permissionMessage}
     />
@@ -298,6 +333,7 @@ function buildBadges(
   file: NativeScannedFileMetadata,
   duplicateUris: Set<string>,
   isTemporary: boolean,
+  classifiedByCloud: boolean,
 ): ReviewBadge[] {
   const badges: ReviewBadge[] = [];
 
@@ -311,6 +347,10 @@ function buildBadges(
 
   if (isTemporary) {
     badges.push('TEMPORARY');
+  }
+
+  if (classifiedByCloud) {
+    badges.push('CLOUD');
   }
 
   return badges;

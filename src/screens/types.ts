@@ -1,6 +1,6 @@
 import {ExtensionBucket} from '../preprocess/extensionBuckets';
 
-export type ReviewBadge = 'DUPLICATE' | 'OLD' | 'TEMPORARY';
+export type ReviewBadge = 'DUPLICATE' | 'OLD' | 'TEMPORARY' | 'CLOUD';
 
 export interface ScannedFileViewModel {
   uri: string;
