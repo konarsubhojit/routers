@@ -85,10 +85,8 @@ export class CloudBatchClassifier {
       return;
     }
 
-    const keys = Array.from(batch.keys());
-    const payloads = keys
-      .map(key => batch.get(key)?.payload)
-      .filter((p): p is CloudPayload => p != null);
+    const entries = Array.from(batch.entries());
+    const payloads = entries.map(([, entry]) => entry.payload);
 
     try {
       const apiKey = await this.deps.apiKeyProvider();
@@ -105,10 +103,9 @@ export class CloudBatchClassifier {
         throw new Error('Cloud classifier returned a mismatched result count.');
       }
 
-      for (const [index, key] of keys.entries()) {
-        const entry = batch.get(key);
+      for (const [index, [key, entry]] of entries.entries()) {
         const result = results[index];
-        if (entry == null || result == null) {
+        if (result == null) {
           continue;
         }
         await this.deps.cache.set(key, result);
@@ -117,9 +114,8 @@ export class CloudBatchClassifier {
         }
       }
     } catch (error) {
-      for (const key of keys) {
-        const entry = batch.get(key);
-        entry?.resolvers.forEach(resolver => resolver.reject(error));
+      for (const [, entry] of entries) {
+        entry.resolvers.forEach(resolver => resolver.reject(error));
       }
     }
   }

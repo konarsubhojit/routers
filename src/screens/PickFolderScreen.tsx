@@ -70,7 +70,13 @@ export function PickFolderScreen({
                 styles.granularityOption,
                 cloudGranularity === 'filename' && styles.granularityOptionSelected,
               ]}>
-              <Text style={styles.granularityOptionText}>Filename only</Text>
+              <Text
+                style={[
+                  styles.granularityOptionText,
+                  cloudGranularity === 'filename' && styles.granularityOptionTextSelected,
+                ]}>
+                Filename only
+              </Text>
             </Pressable>
             <Pressable
               testID="granularity-filename-metadata"
@@ -80,7 +86,14 @@ export function PickFolderScreen({
                 cloudGranularity === 'filename+metadata' &&
                   styles.granularityOptionSelected,
               ]}>
-              <Text style={styles.granularityOptionText}>Filename + size/type</Text>
+              <Text
+                style={[
+                  styles.granularityOptionText,
+                  cloudGranularity === 'filename+metadata' &&
+                    styles.granularityOptionTextSelected,
+                ]}>
+                Filename + size/type
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -164,6 +177,9 @@ const styles = StyleSheet.create({
   granularityOptionText: {
     color: '#111827',
     fontSize: 12,
+  },
+  granularityOptionTextSelected: {
+    color: '#ffffff',
   },
   diagnosticText: {
     color: '#4b5563',

@@ -10,6 +10,7 @@ import {NativeScannedFileMetadata} from '../native/types';
 import {batchMove, BatchMoveGroup, BatchMoveResult} from '../move/batchMove';
 import {CollisionPolicy, DEFAULT_COLLISION_POLICY} from '../move/collisionPolicy';
 import {loadJournal} from '../move/moveJournal';
+import {crashReporter} from '../crash/appCrashReporter';
 import {CloudGranularity} from '../settings/appSettings';
 import {appSettingsStore} from '../settings';
 import {undoLastMove} from '../move/undoMove';
@@ -153,8 +154,16 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       const message = error instanceof Error ? error.message : 'Scan failed.';
       if (isPermissionError(message)) {
         setPermissionMessage(message);
+        void crashReporter.recordNonFatal(
+          'saf-permission-lost',
+          error instanceof Error ? error : new Error(message),
+        );
       } else {
         setScanError(message);
+        void crashReporter.recordNonFatal(
+          'classification-failed',
+          error instanceof Error ? error : new Error(message),
+        );
       }
       setGroupedFiles([]);
       setSelectedUris(new Set());
@@ -212,6 +221,11 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       setCanUndo(loadJournal() != null);
     } catch (error: unknown) {
       setMoveError(error instanceof Error ? error.message : 'Move failed.');
+      void crashReporter.recordNonFatal(
+        'file-move-failed',
+        error instanceof Error ? error : new Error('Move failed.'),
+        {collisionPolicy, fileCountBucket: bucketFileCount(groups)},
+      );
     }
 
     setScreen('review');
@@ -292,13 +306,28 @@ async function hashFiles(
     files.map(async file => {
       try {
         return [file.uri, await sha256(file.uri)] as const;
-      } catch {
+      } catch (error: unknown) {
+        void crashReporter.recordNonFatal(
+          'hash-failed',
+          error instanceof Error ? error : new Error('Hash failed.'),
+        );
         return [file.uri, ''] as const;
       }
     }),
   );
 
   return new Map(uriToHashEntries);
+}
+
+function bucketFileCount(groups: BatchMoveGroup[]): string {
+  const total = groups.reduce((sum, group) => sum + group.files.length, 0);
+  if (total <= 10) {
+    return '1-10';
+  }
+  if (total <= 100) {
+    return '11-100';
+  }
+  return '100+';
 }
 
 function findDuplicateUris(uriToHash: Map<string, string>): Set<string> {

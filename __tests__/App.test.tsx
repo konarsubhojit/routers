@@ -38,6 +38,14 @@ jest.mock('../src/settings', () => ({
   },
 }));
 
+jest.mock('../src/crash/appCrashReporter', () => ({
+  crashReporter: {
+    setCrashlyticsCollectionEnabled: jest.fn().mockResolvedValue(undefined),
+    setCustomKeys: jest.fn().mockResolvedValue(undefined),
+    recordNonFatal: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 jest.mock('../src/classify/tieredClassifier', () => ({
   createTieredClassifier: jest.fn(() => ({
     classify: jest.fn(async ({path}: {path: string}) =>

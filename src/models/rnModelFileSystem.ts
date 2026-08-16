@@ -2,6 +2,27 @@ import RNFS from 'react-native-fs';
 import NetInfo from '@react-native-community/netinfo';
 import {DownloadProgress, ModelDownloadResult, ModelFileSystem} from './types';
 
+/** Bounded read/append window (bytes) used when stitching a resumed download onto the
+ * existing cached file, so a large resumed range never has to be held in memory at once. */
+const APPEND_CHUNK_SIZE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Appends the contents of `chunkPath` onto `destPath` in bounded-size windows (rather than
+ * reading the entire resumed range into memory as one base64 string), keeping peak memory
+ * usage roughly constant regardless of how large the resumed byte range is.
+ */
+async function appendFileInChunks(chunkPath: string, destPath: string): Promise<void> {
+  const chunkSize = Number((await RNFS.stat(chunkPath)).size);
+  let position = 0;
+
+  while (position < chunkSize) {
+    const length = Math.min(APPEND_CHUNK_SIZE_BYTES, chunkSize - position);
+    const base64Window = await RNFS.read(chunkPath, length, position, 'base64');
+    await RNFS.appendFile(destPath, base64Window, 'base64');
+    position += length;
+  }
+}
+
 /**
  * Production `ModelFileSystem` backed by `react-native-fs` (storage) and
  * `@react-native-community/netinfo` (connectivity). Kept separate from
@@ -54,8 +75,7 @@ export function createRNModelFileSystem(): ModelFileSystem {
       await promise;
 
       if (existingSize > 0) {
-        const chunkContents = await RNFS.readFile(chunkPath, 'base64');
-        await RNFS.appendFile(destPath, chunkContents, 'base64');
+        await appendFileInChunks(chunkPath, destPath);
         await RNFS.unlink(chunkPath);
       } else {
         await RNFS.moveFile(chunkPath, destPath);
