@@ -2,6 +2,16 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// Firebase Crashlytics is only wired up when a real `google-services.json` is present
+// (injected from a CI secret; never committed to source control - see .gitignore).
+// This keeps local/dev/CI builds green without any Firebase configuration.
+def googleServicesFile = file("google-services.json")
+def firebaseEnabled = googleServicesFile.exists()
+if (firebaseEnabled) {
+    apply plugin: "com.google.gms.google-services"
+    apply plugin: "com.google.firebase.crashlytics"
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
