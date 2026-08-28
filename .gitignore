@@ -69,6 +69,10 @@ yarn-error.log
 # local MediaPipe model asset
 /android/app/src/main/assets/*.tflite
 
+# Firebase secrets (never commit; injected from CI secrets)
+/android/app/google-services.json
+/ios/GoogleService-Info.plist
+
 # Yarn
 .yarn/*
 !.yarn/patches

@@ -1,6 +1,7 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {aicoreClassifier} from '../classify/aicoreClassifier';
+import {classifyWithCloudEscalation} from '../classify/cloudFallback';
 import {cloudClassifier} from '../classify/cloudClassifier';
 import {mediapipeClassifier} from '../classify/mediapipeClassifier';
 import {createTieredClassifier} from '../classify/tieredClassifier';
@@ -9,6 +10,9 @@ import {NativeScannedFileMetadata} from '../native/types';
 import {batchMove, BatchMoveGroup, BatchMoveResult} from '../move/batchMove';
 import {CollisionPolicy, DEFAULT_COLLISION_POLICY} from '../move/collisionPolicy';
 import {loadJournal} from '../move/moveJournal';
+import {crashReporter} from '../crash/appCrashReporter';
+import {CloudGranularity} from '../settings/appSettings';
+import {appSettingsStore} from '../settings';
 import {undoLastMove} from '../move/undoMove';
 import {isOlderThanThreshold} from '../preprocess/ageFilter';
 import {ExtensionBucket, extensionToBucket} from '../preprocess/extensionBuckets';
@@ -38,6 +42,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   const [scanError, setScanError] = useState<string | null>(null);
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
   const [cloudTierEnabled, setCloudTierEnabled] = useState(false);
+  const [cloudGranularity, setCloudGranularity] = useState<CloudGranularity>('filename');
   const [classifierDiagnostic, setClassifierDiagnostic] = useState(
     'Classifier diagnostics unavailable until first scan.',
   );
@@ -54,14 +59,33 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(() => loadJournal() != null);
 
-  const tieredClassifier = useMemo(
-    () =>
-      createTieredClassifier([
-        aicoreClassifier,
-        mediapipeClassifier,
-        ...(cloudTierEnabled ? [cloudClassifier] : []),
-      ]),
-    [cloudTierEnabled],
+  // Hydrate the opt-in toggle from the persisted setting (default OFF) on mount.
+  useEffect(() => {
+    let cancelled = false;
+    appSettingsStore.load().then(settings => {
+      if (!cancelled) {
+        setCloudTierEnabled(settings.cloudClassificationEnabled);
+        setCloudGranularity(settings.cloudGranularity);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleCloudTierEnabledChange = useCallback((value: boolean) => {
+    setCloudTierEnabled(value);
+    void appSettingsStore.update({cloudClassificationEnabled: value});
+  }, []);
+
+  const handleCloudGranularityChange = useCallback((value: CloudGranularity) => {
+    setCloudGranularity(value);
+    void appSettingsStore.update({cloudGranularity: value});
+  }, []);
+
+  const onDeviceClassifier = useMemo(
+    () => createTieredClassifier([aicoreClassifier, mediapipeClassifier]),
+    [],
   );
 
   const handleScan = useCallback(async () => {
@@ -96,8 +120,18 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       const fileModels = await Promise.all(
         scannedFiles.map(async file => {
           const name = getDisplayName(file);
-          const classification = await tieredClassifier.classify({path: name});
-          const badges = buildBadges(file, duplicateUris, classification === 'TEMPORARY');
+          const {classification, tier} = await classifyWithCloudEscalation(
+            {path: name, sizeBytes: file.sizeBytes ?? undefined, mimeType: file.mimeType ?? undefined},
+            onDeviceClassifier,
+            cloudClassifier,
+            {cloudTierEnabled},
+          );
+          const badges = buildBadges(
+            file,
+            duplicateUris,
+            classification === 'TEMPORARY',
+            tier === 'cloud',
+          );
 
           return {
             uri: file.uri,
@@ -120,8 +154,16 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       const message = error instanceof Error ? error.message : 'Scan failed.';
       if (isPermissionError(message)) {
         setPermissionMessage(message);
+        void crashReporter.recordNonFatal(
+          'saf-permission-lost',
+          error instanceof Error ? error : new Error(message),
+        );
       } else {
         setScanError(message);
+        void crashReporter.recordNonFatal(
+          'classification-failed',
+          error instanceof Error ? error : new Error(message),
+        );
       }
       setGroupedFiles([]);
       setSelectedUris(new Set());
@@ -129,7 +171,7 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       setSelectedTreeUri(null);
       setScreen('pick');
     }
-  }, [tieredClassifier]);
+  }, [onDeviceClassifier, cloudTierEnabled]);
 
   const handleToggleFileSelected = useCallback((uri: string) => {
     setSelectedUris(current => {
@@ -179,6 +221,11 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
       setCanUndo(loadJournal() != null);
     } catch (error: unknown) {
       setMoveError(error instanceof Error ? error.message : 'Move failed.');
+      void crashReporter.recordNonFatal(
+        'file-move-failed',
+        error instanceof Error ? error : new Error('Move failed.'),
+        {collisionPolicy, fileCountBucket: bucketFileCount(groups)},
+      );
     }
 
     setScreen('review');
@@ -231,10 +278,12 @@ export function ScanFlow({isDarkMode}: ScanFlowProps) {
   return (
     <PickFolderScreen
       classifierDiagnostic={classifierDiagnostic}
+      cloudGranularity={cloudGranularity}
       cloudTierEnabled={cloudTierEnabled}
       errorMessage={scanError}
       isDarkMode={isDarkMode}
-      onCloudTierEnabledChange={setCloudTierEnabled}
+      onCloudGranularityChange={handleCloudGranularityChange}
+      onCloudTierEnabledChange={handleCloudTierEnabledChange}
       onScan={handleScan}
       permissionMessage={permissionMessage}
     />
@@ -257,13 +306,28 @@ async function hashFiles(
     files.map(async file => {
       try {
         return [file.uri, await sha256(file.uri)] as const;
-      } catch {
+      } catch (error: unknown) {
+        void crashReporter.recordNonFatal(
+          'hash-failed',
+          error instanceof Error ? error : new Error('Hash failed.'),
+        );
         return [file.uri, ''] as const;
       }
     }),
   );
 
   return new Map(uriToHashEntries);
+}
+
+function bucketFileCount(groups: BatchMoveGroup[]): string {
+  const total = groups.reduce((sum, group) => sum + group.files.length, 0);
+  if (total <= 10) {
+    return '1-10';
+  }
+  if (total <= 100) {
+    return '11-100';
+  }
+  return '100+';
 }
 
 function findDuplicateUris(uriToHash: Map<string, string>): Set<string> {
@@ -298,6 +362,7 @@ function buildBadges(
   file: NativeScannedFileMetadata,
   duplicateUris: Set<string>,
   isTemporary: boolean,
+  classifiedByCloud: boolean,
 ): ReviewBadge[] {
   const badges: ReviewBadge[] = [];
 
@@ -311,6 +376,10 @@ function buildBadges(
 
   if (isTemporary) {
     badges.push('TEMPORARY');
+  }
+
+  if (classifiedByCloud) {
+    badges.push('CLOUD');
   }
 
   return badges;

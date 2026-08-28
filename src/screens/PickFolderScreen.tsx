@@ -1,25 +1,30 @@
 import React from 'react';
-import {Button, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
+import {Button, Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
+import {CloudGranularity} from '../settings/appSettings';
 import {ErrorState, PermissionRequiredState} from './StatusStates';
 
 interface PickFolderScreenProps {
   cloudTierEnabled: boolean;
+  cloudGranularity: CloudGranularity;
   classifierDiagnostic: string;
   errorMessage: string | null;
   isDarkMode: boolean;
   onCloudTierEnabledChange: (value: boolean) => void;
+  onCloudGranularityChange: (value: CloudGranularity) => void;
   onScan: () => void;
   permissionMessage: string | null;
 }
 
 export function PickFolderScreen({
   cloudTierEnabled,
+  cloudGranularity,
   classifierDiagnostic,
   errorMessage,
   isDarkMode,
   onCloudTierEnabledChange,
+  onCloudGranularityChange,
   onScan,
   permissionMessage,
 }: PickFolderScreenProps) {
@@ -51,9 +56,47 @@ export function PickFolderScreen({
           />
         </View>
         <Text style={styles.warningText}>
-          Privacy warning: when enabled, file metadata or extracted text may be
-          sent to cloud services for classification.
+          Privacy warning: when enabled and only for files the on-device model is
+          unsure about, file metadata is sent to Google's Gemini API for
+          classification. File contents are never sent.
         </Text>
+        {cloudTierEnabled ? (
+          <View style={styles.granularityRow}>
+            <Text style={[styles.granularityLabel, palette.subtitle]}>Data sent:</Text>
+            <Pressable
+              testID="granularity-filename"
+              onPress={() => onCloudGranularityChange('filename')}
+              style={[
+                styles.granularityOption,
+                cloudGranularity === 'filename' && styles.granularityOptionSelected,
+              ]}>
+              <Text
+                style={[
+                  styles.granularityOptionText,
+                  cloudGranularity === 'filename' && styles.granularityOptionTextSelected,
+                ]}>
+                Filename only
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="granularity-filename-metadata"
+              onPress={() => onCloudGranularityChange('filename+metadata')}
+              style={[
+                styles.granularityOption,
+                cloudGranularity === 'filename+metadata' &&
+                  styles.granularityOptionSelected,
+              ]}>
+              <Text
+                style={[
+                  styles.granularityOptionText,
+                  cloudGranularity === 'filename+metadata' &&
+                    styles.granularityOptionTextSelected,
+                ]}>
+                Filename + size/type
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       {permissionMessage ? (
@@ -110,6 +153,33 @@ const styles = StyleSheet.create({
   warningText: {
     color: '#dc2626',
     fontSize: 12,
+  },
+  granularityRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  granularityLabel: {
+    fontSize: 12,
+  },
+  granularityOption: {
+    borderColor: '#9ca3af',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  granularityOptionSelected: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  granularityOptionText: {
+    color: '#111827',
+    fontSize: 12,
+  },
+  granularityOptionTextSelected: {
+    color: '#ffffff',
   },
   diagnosticText: {
     color: '#4b5563',

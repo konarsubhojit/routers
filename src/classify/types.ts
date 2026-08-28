@@ -1,5 +1,9 @@
 export interface FileMeta {
   path: string;
+  /** File size in bytes, if known. Metadata only — never file contents. */
+  sizeBytes?: number;
+  /** MIME type, if known. */
+  mimeType?: string;
 }
 
 export type Classification = 'TEMPORARY' | 'PERMANENT' | 'UNKNOWN';
